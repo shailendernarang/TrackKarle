@@ -1,0 +1,8 @@
+[
+  {"bank": "SBI", "rate": "6.80% p.a.", "tenure": "5 years"},
+  {"bank": "HDFC Bank", "rate": "7.00% p.a.", "tenure": "5 years"},
+  {"bank": "ICICI Bank", "rate": "7.00% p.a.", "tenure": "5 years"},
+  {"bank": "Axis Bank", "rate": "7.10% p.a.", "tenure": "5 years"},
+  {"bank": "Kotak Mahindra Bank", "rate": "7.20% p.a.", "tenure": "5 years"},
+  {"bank": "IDFC First Bank", "rate": "7.50% p.a.", "tenure": "5 years"}
+]

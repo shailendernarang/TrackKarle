@@ -1,0 +1,122 @@
+bank,tenure,non_senior_rate,senior_rate
+SBI,1y,6.50,7.00
+SBI,1y 6m,6.70,7.20
+SBI,2y,6.75,7.25
+SBI,3y,6.80,7.30
+SBI,5y,6.80,7.30
+HDFC Bank,1y,6.80,7.30
+HDFC Bank,2y,6.90,7.40
+HDFC Bank,3y,7.00,7.50
+HDFC Bank,5y,7.00,7.50
+ICICI Bank,1y,6.85,7.35
+ICICI Bank,2y,6.95,7.45
+ICICI Bank,3y,7.00,7.50
+ICICI Bank,5y,7.00,7.50
+Axis Bank,1y,6.90,7.40
+Axis Bank,2y,7.00,7.50
+Axis Bank,3y,7.05,7.55
+Axis Bank,5y,7.10,7.60
+Kotak Mahindra Bank,1y,7.00,7.50
+Kotak Mahindra Bank,2y,7.10,7.60
+Kotak Mahindra Bank,3y,7.15,7.65
+Kotak Mahindra Bank,5y,7.20,7.70
+IDFC First Bank,1y,7.30,7.80
+IDFC First Bank,2y,7.40,7.90
+IDFC First Bank,3y,7.45,7.95
+IDFC First Bank,5y,7.50,8.00
+Yes Bank,1y,7.00,7.50
+Yes Bank,2y,7.15,7.65
+Yes Bank,3y,7.20,7.70
+Yes Bank,5y,7.25,7.75
+RBL Bank,1y,7.20,7.70
+RBL Bank,2y,7.35,7.85
+RBL Bank,3y,7.45,7.95
+RBL Bank,5y,7.50,8.00
+IndusInd Bank,1y,7.20,7.70
+IndusInd Bank,2y,7.35,7.85
+IndusInd Bank,3y,7.45,7.95
+IndusInd Bank,5y,7.50,8.00
+Federal Bank,1y,6.80,7.30
+Federal Bank,2y,6.95,7.45
+Federal Bank,3y,7.05,7.55
+Federal Bank,5y,7.10,7.60
+Bank of Baroda,1y,6.60,7.10
+Bank of Baroda,2y,6.80,7.30
+Bank of Baroda,3y,6.85,7.35
+Bank of Baroda,5y,6.90,7.40
+PNB,1y,6.60,7.10
+PNB,2y,6.80,7.30
+PNB,3y,6.85,7.35
+PNB,5y,6.90,7.40
+Canara Bank,1y,6.60,7.10
+Canara Bank,2y,6.80,7.30
+Canara Bank,3y,6.85,7.35
+Canara Bank,5y,6.90,7.40
+Union Bank,1y,6.60,7.10
+Union Bank,2y,6.80,7.30
+Union Bank,3y,6.85,7.35
+Union Bank,5y,6.90,7.40
+IDBI Bank,1y,6.80,7.30
+IDBI Bank,2y,6.90,7.40
+IDBI Bank,3y,6.95,7.45
+IDBI Bank,5y,7.00,7.50
+AU Small Finance Bank,1y,7.50,8.00
+AU Small Finance Bank,2y,7.60,8.10
+AU Small Finance Bank,3y,7.70,8.20
+AU Small Finance Bank,5y,7.75,8.25
+Equitas Small Finance Bank,1y,7.70,8.20
+Equitas Small Finance Bank,2y,7.85,8.35
+Equitas Small Finance Bank,3y,7.95,8.45
+Equitas Small Finance Bank,5y,8.00,8.50
+Ujjivan Small Finance Bank,1y,7.70,8.20
+Ujjivan Small Finance Bank,2y,7.85,8.35
+Ujjivan Small Finance Bank,3y,7.95,8.45
+Ujjivan Small Finance Bank,5y,8.00,8.50
+Fincare Small Finance Bank,1y,7.80,8.30
+Fincare Small Finance Bank,2y,7.95,8.45
+Fincare Small Finance Bank,3y,8.05,8.55
+Fincare Small Finance Bank,5y,8.10,8.60
+Jana Small Finance Bank,1y,8.00,8.50
+Jana Small Finance Bank,2y,8.10,8.60
+Jana Small Finance Bank,3y,8.20,8.70
+Jana Small Finance Bank,5y,8.25,8.75
+Suryoday Small Finance Bank,1y,8.00,8.50
+Suryoday Small Finance Bank,2y,8.10,8.60
+Suryoday Small Finance Bank,3y,8.20,8.70
+Suryoday Small Finance Bank,5y,8.25,8.75
+DCB Bank,1y,7.20,7.70
+DCB Bank,2y,7.35,7.85
+DCB Bank,3y,7.45,7.95
+DCB Bank,5y,7.50,8.00
+Karnataka Bank,1y,7.00,7.50
+Karnataka Bank,2y,7.15,7.65
+Karnataka Bank,3y,7.20,7.70
+Karnataka Bank,5y,7.25,7.75
+South Indian Bank,1y,6.90,7.40
+South Indian Bank,2y,7.00,7.50
+South Indian Bank,3y,7.05,7.55
+South Indian Bank,5y,7.10,7.60
+Bandhan Bank,1y,7.20,7.70
+Bandhan Bank,2y,7.35,7.85
+Bandhan Bank,3y,7.45,7.95
+Bandhan Bank,5y,7.50,8.00
+Karur Vysya Bank,1y,7.00,7.50
+Karur Vysya Bank,2y,7.10,7.60
+Karur Vysya Bank,3y,7.20,7.70
+Karur Vysya Bank,5y,7.25,7.75
+City Union Bank,1y,7.00,7.50
+City Union Bank,2y,7.10,7.60
+City Union Bank,3y,7.20,7.70
+City Union Bank,5y,7.25,7.75
+Indian Bank,1y,6.60,7.10
+Indian Bank,2y,6.75,7.25
+Indian Bank,3y,6.80,7.30
+Indian Bank,5y,6.90,7.40
+Indian Overseas Bank,1y,6.60,7.10
+Indian Overseas Bank,2y,6.75,7.25
+Indian Overseas Bank,3y,6.80,7.30
+Indian Overseas Bank,5y,6.90,7.40
+Central Bank of India,1y,6.55,7.05
+Central Bank of India,2y,6.70,7.20
+Central Bank of India,3y,6.80,7.30
+Central Bank of India,5y,6.85,7.35
