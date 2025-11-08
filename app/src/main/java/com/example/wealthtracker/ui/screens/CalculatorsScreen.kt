@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material3.*
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -30,7 +31,7 @@ import kotlin.math.pow
 
 // ------------------------ DATA + HELPERS ------------------------
 
-private data class FdRateRow(val bank: String, val tenure: String, val nonSeniorRate: Double, val seniorRate: Double)
+data class FdRateRow(val bank: String, val tenure: String, val nonSeniorRate: Double, val seniorRate: Double)
 
 private fun loadFdRates(ctx: android.content.Context): List<FdRateRow> {
     return runCatching {
@@ -129,15 +130,18 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 }
             }
             Spacer(Modifier.height(12.dp))
-
-            Box(Modifier.fillMaxWidth().height(1200.dp)) {
-                HorizontalPager(state = pagerState) { page ->
-                    when (page) {
-                        0 -> SipCalculator()
-                        1 -> LumpsumCalculator()
-                        2 -> FdCalculator()
-                        else -> PpfEpfCalculator()
-                    }
+            // Hoist FD rates once per screen to avoid multiple loads and pass down
+            val fdRateRows = remember { loadFdRates(ctx) }
+            // Pager fills remaining space; each page handles its own scrolling
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            ) { page ->
+                when (page) {
+                    0 -> SipCalculator()
+                    1 -> LumpsumCalculator()
+                    2 -> FdCalculator(fdRateRows)
+                    else -> PpfEpfCalculator()
                 }
             }
         }
@@ -292,7 +296,7 @@ fun LumpsumCalculator() {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun FdCalculator() {
+fun FdCalculator(rateRows: List<FdRateRow>) {
 
     var principal by remember { mutableStateOf("") }
     var rate by remember { mutableStateOf("") }
@@ -302,8 +306,7 @@ fun FdCalculator() {
     var selectedBank by remember { mutableStateOf("") }
     var senior by remember { mutableStateOf(false) }
 
-    val ctx = LocalContext.current
-    val rateRows = remember { loadFdRates(ctx) }
+    // rateRows provided by parent; stable across recompositions
     val banks = remember(rateRows) { rateRows.map { it.bank }.distinct().sorted() }
     val tenures = remember(rateRows) {
         rateRows.map { normalizeTenure(it.tenure) }
@@ -361,7 +364,7 @@ fun FdCalculator() {
                             onValueChange = {},
                             label = { Text("Bank") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = bankExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                         )
                         ExposedDropdownMenu(expanded = bankExpanded, onDismissRequest = { bankExpanded = false }) {
                             banks.forEach { b ->
@@ -383,7 +386,7 @@ fun FdCalculator() {
                             onValueChange = {},
                             label = { Text("Tenure") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tenureExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                         )
                         ExposedDropdownMenu(expanded = tenureExpanded, onDismissRequest = { tenureExpanded = false }) {
                             tenures.forEach { tOpt ->
@@ -439,7 +442,7 @@ fun FdCalculator() {
                             onValueChange = {},
                             label = { Text("Frequency") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = freqExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                         )
                         ExposedDropdownMenu(expanded = freqExpanded, onDismissRequest = { freqExpanded = false }) {
                             listOf("Monthly", "Quarterly", "Half-yearly", "Yearly").forEach {
@@ -462,6 +465,7 @@ fun FdCalculator() {
             }
             Spacer(Modifier.height(4.dp))
             FdRatesComparison(
+                rateRows = rateRows,
                 selectedTenure = selectedTenure,
                 senior = senior,
                 onUseRate = { used -> rate = "%.2f".format(used) }
@@ -474,10 +478,7 @@ fun FdCalculator() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FdRatesComparison(selectedTenure: String, senior: Boolean, onUseRate: (Double) -> Unit) {
-
-    val ctx = LocalContext.current
-    val rateRows = remember { loadFdRates(ctx) }
+fun FdRatesComparison(rateRows: List<FdRateRow>, selectedTenure: String, senior: Boolean, onUseRate: (Double) -> Unit) {
     val norm = normalizeTenure(selectedTenure)
 
     var sortExpanded by remember { mutableStateOf(false) }
@@ -507,7 +508,7 @@ fun FdRatesComparison(selectedTenure: String, senior: Boolean, onUseRate: (Doubl
                         onValueChange = {},
                         label = { Text("Sort") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sortExpanded) },
-                        modifier = Modifier.menuAnchor().widthIn(min = 200.dp)
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).widthIn(min = 200.dp)
                     )
                     ExposedDropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
                         listOf("Name: A → Z", "Name: Z → A", "Rate: High → Low", "Rate: Low → High").forEach { opt ->
@@ -527,7 +528,7 @@ fun FdRatesComparison(selectedTenure: String, senior: Boolean, onUseRate: (Doubl
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(sorted) { row ->
+                items(sorted, key = { it.bank + ":" + it.tenure }) { row ->
                     val rTxt = if (senior) row.seniorRate else row.nonSeniorRate
 
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -596,7 +597,7 @@ fun PpfEpfCalculator() {
             ResultRow("Future Value", "₹ ${formatIndianNumber(future.toLong().toString())}")
             ResultRow("Estimated Gain", "₹ ${formatIndianNumber(gain.toLong().toString())}")
 
-            Divider(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
             ResultRow(
                 "80C Eligible (est.)",

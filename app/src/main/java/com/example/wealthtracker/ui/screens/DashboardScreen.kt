@@ -312,37 +312,12 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                 var animateOnToggle by remember(items, filter, vizType) { mutableStateOf(true) }
                 AndroidView(
                     factory = { context ->
-                        com.github.mikephil.charting.charts.PieChart(context).apply {
-                            description.isEnabled = false
-                            legend.isEnabled = false
-                            // We compute percentages ourselves from dataset values
-                            setUsePercentValues(false)
-                            // Remove labels on slices
-                            setDrawEntryLabels(false)
-                            setHoleColor(android.graphics.Color.TRANSPARENT)
-                            setTouchEnabled(true)
-                            setExtraOffsets(8f, 8f, 8f, 8f)
-                            setCenterTextColor(onSurface)
-                            setCenterTextSize(14f)
-                            setHighlightPerTapEnabled(true)
-                        }
+                        com.example.wealthtracker.ui.charts.ChartUtils.createPieChart(context, onSurface)
                     },
                     update = { view ->
-                        val total = data.sumOf { it.second }.coerceAtLeast(1.0)
-                        // Initialize once
-                        if (view.data == null) {
-                            val entries = data.map { (label, value) -> com.github.mikephil.charting.data.PieEntry(value.toFloat(), label) }
-                            val set = com.github.mikephil.charting.data.PieDataSet(entries, null).apply {
-                                this.colors = colors
-                                sliceSpace = 2f
-                                selectionShift = 6f
-                                // keep labels inside and never draw dataset values/lines
-                                yValuePosition = com.github.mikephil.charting.data.PieDataSet.ValuePosition.INSIDE_SLICE
-                                xValuePosition = com.github.mikephil.charting.data.PieDataSet.ValuePosition.INSIDE_SLICE
-                            }
-                            view.data = com.github.mikephil.charting.data.PieData(set).apply { setDrawValues(false) }
-                            view.centerText = ""
-                            // Custom marker to draw a small line and percentage text for selected slice only
+                        val first = view.data == null
+                        com.example.wealthtracker.ui.charts.ChartUtils.bindPieData(view, data, colors, animateOnToggle)
+                        if (first) {
                             val txtPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                                 color = onSurface
                                 textSize = 40f
@@ -383,49 +358,11 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                             view.setOnChartValueSelectedListener(object : com.github.mikephil.charting.listener.OnChartValueSelectedListener {
                                 override fun onValueSelected(e: com.github.mikephil.charting.data.Entry?, h: com.github.mikephil.charting.highlight.Highlight?) {
                                     selectedLabel = (e as? com.github.mikephil.charting.data.PieEntry)?.label
-                                    // no animation on selection
                                 }
                                 override fun onNothingSelected() { selectedLabel = null }
                             })
-                            // Play initial animation on first render if enabled
-                            if (animateOnToggle) {
-                                view.animateY(700, com.github.mikephil.charting.animation.Easing.EaseInOutQuad)
-                                animateOnToggle = false
-                            }
-                            view.invalidate()
-                        } else {
-                            // Update or rebuild dataset based on filter changes
-                            val set = view.data.getDataSetByIndex(0) as com.github.mikephil.charting.data.PieDataSet
-                            val currentLabels = set.values.map { it.label }
-                            val newLabels = data.map { it.first }
-                            val needsRebuild = currentLabels.size != newLabels.size || currentLabels != newLabels
-                            if (needsRebuild) {
-                                val newEntries = data.map { (label, value) -> com.github.mikephil.charting.data.PieEntry(value.toFloat(), label) }
-                                set.values = newEntries
-                                set.colors = newLabels.mapIndexed { idx, _ -> colors[idx % colors.size] }
-                            } else {
-                                // Keep same order; update y values only
-                                data.forEachIndexed { index, pair ->
-                                    set.values[index] = com.github.mikephil.charting.data.PieEntry(pair.second.toFloat(), pair.first)
-                                }
-                            }
-                            // Dataset always without values/lines; marker handles selection label+line
-                            view.data.setDrawValues(false)
-                            set.yValuePosition = com.github.mikephil.charting.data.PieDataSet.ValuePosition.INSIDE_SLICE
-                            set.xValuePosition = com.github.mikephil.charting.data.PieDataSet.ValuePosition.INSIDE_SLICE
-                            view.data.notifyDataChanged()
-                            view.notifyDataSetChanged()
-                            // Clear stray highlights when nothing is selected (prevents empty marker/lines)
-                            if (selectedLabel == null) {
-                                view.highlightValues(null)
-                            }
-                            // animate only on filter/toggle updates, not selection
-                            if (animateOnToggle) {
-                                view.animateY(700, com.github.mikephil.charting.animation.Easing.EaseInOutQuad)
-                                animateOnToggle = false
-                            }
-                            view.invalidate()
                         }
+                        if (animateOnToggle) animateOnToggle = false
                     },
                     modifier = Modifier.fillMaxWidth().height(240.dp)
                 )
@@ -449,57 +386,20 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                 var barAnimateOnToggle by remember(items, filter, vizType) { mutableStateOf(true) }
                 AndroidView(
                     factory = { context ->
-                        com.github.mikephil.charting.charts.BarChart(context).apply {
-                            description.isEnabled = false
-                            legend.isEnabled = false
-                            axisRight.isEnabled = false
-                            xAxis.position = com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM
-                            xAxis.setDrawGridLines(false)
-                            axisLeft.setDrawGridLines(true)
-                            // Axis/label text colors for theme
-                            xAxis.textColor = onSurface
-                            axisLeft.textColor = onSurface
-                            xAxis.setGranularity(1f)
-                            xAxis.setLabelRotationAngle(-20f)
-                            setFitBars(true)
-                            setTouchEnabled(false)
-                            setExtraOffsets(12f, 12f, 12f, 12f)
-                            // animation is controlled in update
-                        }
+                        com.example.wealthtracker.ui.charts.ChartUtils.createBarChart(context, onSurface)
                     },
                     update = { view ->
                         val total = data.sumOf { it.second }.coerceAtLeast(1.0)
-                        val entries = data.mapIndexed { idx, (_, value) ->
-                            val pct = (value / total * 100.0).toFloat()
-                            com.github.mikephil.charting.data.BarEntry(idx.toFloat(), pct)
-                        }
-                        val set = com.github.mikephil.charting.data.BarDataSet(entries, null).apply {
-                            this.colors = colors
-                        }
-                        view.data = com.github.mikephil.charting.data.BarData(set).apply {
-                            setDrawValues(true)
-                            setValueTextSize(9f)
-                            setValueTextColor(onSurface)
-                            setValueFormatter(object : com.github.mikephil.charting.formatter.ValueFormatter() {
-                                override fun getBarLabel(barEntry: com.github.mikephil.charting.data.BarEntry?): String {
-                                    val v = barEntry?.y?.toInt() ?: 0
-                                    return "${FormatUtils.formatInt(v)}%"
-                                }
-                            })
-                            barWidth = 0.6f
-                        }
+                        val pctValues = data.map { (it.second / total * 100.0).toFloat() }
                         val labels = data.map { it.first }
-                        view.xAxis.valueFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
-                            override fun getAxisLabel(value: Float, axis: com.github.mikephil.charting.components.AxisBase?): String {
-                                val i = value.toInt()
-                                return if (i in labels.indices) labels[i] else ""
+                        com.example.wealthtracker.ui.charts.ChartUtils.bindBarData(view, labels, pctValues, colors, onSurface, barAnimateOnToggle)
+                        view.data.setValueFormatter(object : com.github.mikephil.charting.formatter.ValueFormatter() {
+                            override fun getBarLabel(barEntry: com.github.mikephil.charting.data.BarEntry?): String {
+                                val v = barEntry?.y?.toInt() ?: 0
+                                return "${FormatUtils.formatInt(v)}%"
                             }
-                        }
-                        if (barAnimateOnToggle) {
-                            view.animateY(700, com.github.mikephil.charting.animation.Easing.EaseInOutQuad)
-                            barAnimateOnToggle = false
-                        }
-                        view.invalidate()
+                        })
+                        if (barAnimateOnToggle) barAnimateOnToggle = false
                     },
                     modifier = Modifier.fillMaxWidth().height(180.dp)
                 )

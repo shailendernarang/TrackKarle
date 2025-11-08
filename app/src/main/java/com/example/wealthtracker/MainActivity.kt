@@ -69,6 +69,7 @@ import com.ss.wealthtracker.R
 import androidx.compose.ui.res.stringResource
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.ui.platform.LocalContext
@@ -188,59 +189,22 @@ class MainActivity : AppCompatActivity() {
                         val nav = rememberNavController()
                         // Create Hilt VM outside any localized provider to keep Activity context intact
                         val vm: InvestmentViewModel = hiltViewModel()
-                        
-                        var startRoute by remember { mutableStateOf<String?>(null) }
-                        LaunchedEffect(fromNotification) {
-                            if (fromNotification) {
-                                val firstList = vm.investments.first()
-                                startRoute = if (firstList.isNotEmpty()) "dashboard" else "invest"
-                            } else {
-                                // winner: first non-empty list OR timeout fallback
-                                launch {
-                                    vm.investments.collect { list ->
-                                        if (list.isNotEmpty() && startRoute == null) {
-                                            startRoute = "dashboard"
-                                        }
-                                    }
-                                }
-                                launch {
-                                    delay(600)
-                                    if (startRoute == null) startRoute = "invest"
-                                }
-                            }
-                        }
+                        val startRoute = rememberStartRoute(fromNotification, vm)
                         if (startRoute != null) {
-                            NavHost(navController = nav, startDestination = startRoute!!) {
+                            NavHost(navController = nav, startDestination = startRoute) {
                                 composable("dashboard") {
-                                    val base = LocalContext.current
-                                    val localized = remember(useHindiNumerals, base) {
-                                        val tag = if (useHindiNumerals) "hi-IN" else java.util.Locale.getDefault().toLanguageTag()
-                                        val conf = Configuration(base.resources.configuration)
-                                        conf.setLocales(android.os.LocaleList.forLanguageTags(tag))
-                                        base.createConfigurationContext(conf)
-                                    }
-                                    key(useHindiNumerals) {
-                                        CompositionLocalProvider(LocalContext provides localized) {
-                                            DashboardScreen(
-                                                viewModel = vm,
-                                                onAddClick = { nav.navigate("invest") },
-                                                onOpenInvestments = { nav.navigate("invest") },
-                                                onOpenCalculators = { nav.navigate("calculators?tab=fd") }
-                                            )
-                                        }
+                                    WithLocalizedContext(useHindiNumerals) {
+                                        DashboardScreen(
+                                            viewModel = vm,
+                                            onAddClick = { nav.navigate("invest") },
+                                            onOpenInvestments = { nav.navigate("invest") },
+                                            onOpenCalculators = { nav.navigate("calculators?tab=fd") }
+                                        )
                                     }
                                 }
                                 composable("invest") {
                                     val canGoBack = nav.previousBackStackEntry != null
-                                    val base = LocalContext.current
-                                    val localized = remember(useHindiNumerals, base) {
-                                        val tag = if (useHindiNumerals) "hi-IN" else java.util.Locale.getDefault().toLanguageTag()
-                                        val conf = Configuration(base.resources.configuration)
-                                        conf.setLocales(android.os.LocaleList.forLanguageTags(tag))
-                                        base.createConfigurationContext(conf)
-                                    }
-                                    key(useHindiNumerals) {
-                                        CompositionLocalProvider(LocalContext provides localized) {
+                                    WithLocalizedContext(useHindiNumerals) {
                                         InvestmentScreen(
                                             viewModel = vm,
                                             onOpenDashboard = { nav.navigate("dashboard") },
@@ -267,7 +231,6 @@ class MainActivity : AppCompatActivity() {
                                                 scope.launch { SettingsStore.setHindiNumerals(applicationContext, useHindiNumerals) }
                                             }
                                         )
-                                        }
                                     }
                                 }
                                 composable(
@@ -279,21 +242,12 @@ class MainActivity : AppCompatActivity() {
                                 ) { backStackEntry ->
                                     val tab = backStackEntry.arguments?.getString("tab")
                                     val canGoBack = nav.previousBackStackEntry != null
-                                    val base = LocalContext.current
-                                    val localized = remember(useHindiNumerals, base) {
-                                        val tag = if (useHindiNumerals) "hi-IN" else java.util.Locale.getDefault().toLanguageTag()
-                                        val conf = Configuration(base.resources.configuration)
-                                        conf.setLocales(android.os.LocaleList.forLanguageTags(tag))
-                                        base.createConfigurationContext(conf)
-                                    }
-                                    key(useHindiNumerals) {
-                                        CompositionLocalProvider(LocalContext provides localized) {
+                                    WithLocalizedContext(useHindiNumerals) {
                                         com.example.wealthtracker.ui.screens.CalculatorsScreen(
                                             onBack = { nav.popBackStack() },
                                             initialTab = tab,
                                             showBack = canGoBack
                                         )
-                                        }
                                     }
                                 }
                                 composable("settings") {
@@ -369,6 +323,50 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+@Composable
+private fun rememberStartRoute(fromNotification: Boolean, vm: InvestmentViewModel): String? {
+    var route by remember(fromNotification) { mutableStateOf<String?>(null) }
+    LaunchedEffect(fromNotification) {
+        if (fromNotification) {
+            val firstList = vm.investments.first()
+            route = if (firstList.isNotEmpty()) "dashboard" else "invest"
+        } else {
+            kotlinx.coroutines.coroutineScope {
+                val collector = launch {
+                    vm.investments.collect { list ->
+                        if (list.isNotEmpty() && route == null) {
+                            route = "dashboard"
+                        }
+                    }
+                }
+                launch {
+                    delay(600)
+                    if (route == null) route = "invest"
+                    collector.cancel()
+                }
+                // Both run; the first to set route wins
+            }
+        }
+    }
+    return route
+}
+
+@Composable
+private fun WithLocalizedContext(useHindiNumerals: Boolean, content: @Composable () -> Unit) {
+    val base = LocalContext.current
+    val localized = remember(useHindiNumerals, base) {
+        val tag = if (useHindiNumerals) "hi-IN" else java.util.Locale.getDefault().toLanguageTag()
+        val conf = Configuration(base.resources.configuration)
+        conf.setLocales(android.os.LocaleList.forLanguageTags(tag))
+        base.createConfigurationContext(conf)
+    }
+    key(useHindiNumerals) {
+        CompositionLocalProvider(LocalContext provides localized) {
+            content()
+        }
+    }
+}
 
     override fun onStop() {
         super.onStop()
