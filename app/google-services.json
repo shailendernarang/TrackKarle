@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "542953107529",
+    "project_id": "trackkarle",
+    "storage_bucket": "trackkarle.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:542953107529:android:7c1c2b84de07c3195a4f98",
+        "android_client_info": {
+          "package_name": "com.ss.wealthtracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDM8AiM0CqbukqahHoVo3X2Avt1YibW2MQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

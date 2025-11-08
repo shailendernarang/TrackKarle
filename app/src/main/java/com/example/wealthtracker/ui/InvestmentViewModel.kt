@@ -51,7 +51,7 @@ class InvestmentViewModel @Inject constructor(
     fun consumeMessage() { _message.value = null }
 
     fun addInvestment(amountInput: String, investmentType: String, bankName: String?, displayName: String? = null) {
-        val amount = amountInput.toDoubleOrNull()
+        val amount = parseAmount(amountInput)
         val cleanType = investmentType.ifBlank { "Others" }
         if (amount == null || amount <= 0.0) { _message.value = "Enter a valid amount"; return }
         if (cleanType == "FD" && (bankName == null || bankName.isBlank())) {
@@ -82,6 +82,18 @@ class InvestmentViewModel @Inject constructor(
         _message.value = "Cleared"
     }
 
+    fun reAdd(entity: InvestmentEntity) {
+        viewModelScope.launch {
+            repo.addInvestment(
+                type = entity.type,
+                amount = entity.amount,
+                investmentType = entity.investmentType,
+                bankName = entity.bankName
+            )
+            _message.value = "Restored"
+        }
+    }
+
     fun updateInvestment(
         id: Long,
         newDisplayType: String,
@@ -89,7 +101,7 @@ class InvestmentViewModel @Inject constructor(
         newInvestmentType: String,
         newBank: String?
     ) {
-        val amount = newAmountInput.toDoubleOrNull() ?: return
+        val amount = parseAmount(newAmountInput) ?: return
         val cleanType = newDisplayType.trim().ifEmpty { newInvestmentType }
         val current = investments.value.firstOrNull { it.id == id } ?: return
         viewModelScope.launch {
@@ -102,6 +114,17 @@ class InvestmentViewModel @Inject constructor(
                 )
             )
             _message.value = "Updated"
+        }
+    }
+
+    private fun parseAmount(input: String): Double? {
+        val clean = input.replace(",", "").trim()
+        if (clean.isEmpty()) return null
+        return try {
+            val bd = java.math.BigDecimal(clean).setScale(2, java.math.RoundingMode.HALF_UP)
+            bd.toDouble()
+        } catch (_: Exception) {
+            null
         }
     }
 

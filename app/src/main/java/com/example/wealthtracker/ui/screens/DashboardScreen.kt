@@ -12,9 +12,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Savings
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.res.stringResource
 import com.google.android.gms.ads.AdSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,12 +51,12 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Your Dashboard") },
+                title = { Text(stringResource(id = com.ss.wealthtracker.R.string.title_dashboard)) },
                 actions = {
                     FilledTonalButton(onClick = onOpenInvestments) {
-                        Icon(Icons.Default.TrendingUp, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("View Investments")
+                        Text(stringResource(id = com.ss.wealthtracker.R.string.cta_view_investments))
                     }
                 }
             )
@@ -96,7 +98,7 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Private • No cloud sync • Offline",
+                            stringResource(id = com.ss.wealthtracker.R.string.privacy_tagline),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -112,7 +114,7 @@ fun DashboardScreen(
                 ExtendedFloatingActionButton(
                     onClick = onAddClick,
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text = { Text("Add Investment") }
+                    text = { Text(stringResource(id = com.ss.wealthtracker.R.string.btn_add_investment)) }
                 )
             }
         }
@@ -132,14 +134,14 @@ fun DashboardScreen(
                     val icon = when (key) {
                         "All" -> Icons.Default.Savings
                         "FD" -> Icons.Default.AccountBalance
-                        "Mutual Fund", "NPS", "Equity" -> Icons.Default.TrendingUp
+                        "Mutual Fund", "NPS", "Equity" -> Icons.AutoMirrored.Filled.TrendingUp
                         "Gold" -> Icons.Default.Savings
                         else -> Icons.Default.Savings
                     }
                     FilterChip(
                         selected = selected,
                         onClick = { viewModel.setTypeFilter(if (key == "All") null else key) },
-                        label = { Text("$display ($count)") },
+                        label = { Text("$display (${FormatUtils.formatInt(count)})") },
                         leadingIcon = { Icon(icon, contentDescription = null) }
                     )
                 }
@@ -149,14 +151,14 @@ fun DashboardScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SummaryCard(
                     modifier = Modifier.weight(1f),
-                    title = "Total Amount",
+                    title = stringResource(id = com.ss.wealthtracker.R.string.label_total_amount),
                     value = FormatUtils.formatINR(allItems.sumOf { it.amount }),
                     color = MaterialTheme.colorScheme.primary
                 )
                 SummaryCard(
                     modifier = Modifier.weight(1f),
-                    title = "Investments",
-                    value = allItems.size.toString(),
+                    title = stringResource(id = com.ss.wealthtracker.R.string.label_investments),
+                    value = FormatUtils.formatInt(allItems.size),
                     color = MaterialTheme.colorScheme.tertiary
                 )
             }
@@ -165,12 +167,12 @@ fun DashboardScreen(
 
             // Recent 5
             if (allItems.isNotEmpty()) {
-                Text("Recent investments", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(id = com.ss.wealthtracker.R.string.recent_investments), style = MaterialTheme.typography.titleLarge)
                 LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 88.dp)) {
                     items(allItems.sortedByDescending { it.createdAt }.take(5)) { e ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text(if (e.investmentType == "FD") "Fixed Deposit" else e.investmentType, fontWeight = FontWeight.SemiBold)
+                                Text(if (e.investmentType == "FD") stringResource(id = com.ss.wealthtracker.R.string.fixed_deposit) else e.investmentType, fontWeight = FontWeight.SemiBold)
                                 val sub = e.bankName ?: if (e.investmentType == "Others") e.type else null
                                 if (!sub.isNullOrBlank()) {
                                     Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -178,7 +180,7 @@ fun DashboardScreen(
                             }
                             Text(FormatUtils.formatINR(e.amount), fontWeight = FontWeight.Bold)
                         }
-                        Divider()
+                        HorizontalDivider()
                     }
                 }
                 // Removed trailing divider to avoid bottom line break appearance
@@ -204,7 +206,7 @@ private fun FdRatesSection() {
     Spacer(Modifier.height(12.dp))
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(12.dp)) {
-            Text("Compare FD Rates", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(id = com.ss.wealthtracker.R.string.compare_fd_rates), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             data.take(8).forEach { (bank, rate, tenure) ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -214,11 +216,11 @@ private fun FdRatesSection() {
                     }
                     Text(rate, fontWeight = FontWeight.Bold)
                 }
-                Divider()
+                HorizontalDivider()
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "Source: Bank websites (sample) — see bank sites for latest rates",
+                stringResource(id = com.ss.wealthtracker.R.string.fd_rates_source),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -241,7 +243,7 @@ private fun SummaryCard(modifier: Modifier = Modifier, title: String, value: Str
 private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?, vizType: String, onVizTypeChange: (String) -> Unit) {
     val data = run {
         val grouped = if (filter == "FD") {
-            items.groupBy { (it.bankName ?: "Unknown Bank").ifBlank { "Unknown Bank" } }
+            items.groupBy { (it.bankName ?: stringResource(id = com.ss.wealthtracker.R.string.unknown_bank)).ifBlank { stringResource(id = com.ss.wealthtracker.R.string.unknown_bank) } }
         } else {
             items.groupBy { it.investmentType }
         }
@@ -265,8 +267,11 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
 
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp)) {
+            // Resolve dynamic text colors based on theme
+            val onSurface = MaterialTheme.colorScheme.onSurface.toArgb()
+            val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Overall Allocation", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(id = com.ss.wealthtracker.R.string.overall_allocation), style = MaterialTheme.typography.titleMedium)
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
@@ -286,7 +291,7 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                             .clickable { if (vizType != "Pie") onVizTypeChange("Pie") }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Text("Pie", color = if (vizType == "Pie") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(id = com.ss.wealthtracker.R.string.viz_pie), color = if (vizType == "Pie") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
                     }
                     // Bar segment
                     Box(
@@ -296,12 +301,12 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                             .clickable { if (vizType != "Bar") onVizTypeChange("Bar") }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Text("Bar", color = if (vizType == "Bar") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(id = com.ss.wealthtracker.R.string.viz_bar), color = if (vizType == "Bar") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
             if (data.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text("No data to visualize", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text(stringResource(id = com.ss.wealthtracker.R.string.no_data_to_visualize), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else if (vizType == "Pie") {
                 var selectedLabel by remember(items, filter) { mutableStateOf<String?>(null) }
                 var animateOnToggle by remember(items, filter, vizType) { mutableStateOf(true) }
@@ -317,7 +322,7 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                             setHoleColor(android.graphics.Color.TRANSPARENT)
                             setTouchEnabled(true)
                             setExtraOffsets(8f, 8f, 8f, 8f)
-                            setCenterTextColor(android.graphics.Color.DKGRAY)
+                            setCenterTextColor(onSurface)
                             setCenterTextSize(14f)
                             setHighlightPerTapEnabled(true)
                         }
@@ -339,12 +344,12 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                             view.centerText = ""
                             // Custom marker to draw a small line and percentage text for selected slice only
                             val txtPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                color = android.graphics.Color.DKGRAY
+                                color = onSurface
                                 textSize = 40f
                                 typeface = android.graphics.Typeface.create("montserrat", android.graphics.Typeface.BOLD)
                             }
                             val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                color = android.graphics.Color.DKGRAY
+                                color = onSurfaceVariant
                                 strokeWidth = 6f
                             }
                             val chartRef = view
@@ -435,7 +440,8 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                                 drawRect(color = Color(colors[idx % colors.size]))
                             }
                             Spacer(Modifier.width(6.dp))
-                            Text("$label: ${"%.0f".format(pct)}%", style = MaterialTheme.typography.labelMedium)
+                            val pctInt = pct.toInt()
+                            Text("$label: ${FormatUtils.formatInt(pctInt)}%", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -450,6 +456,9 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                             xAxis.position = com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM
                             xAxis.setDrawGridLines(false)
                             axisLeft.setDrawGridLines(true)
+                            // Axis/label text colors for theme
+                            xAxis.textColor = onSurface
+                            axisLeft.textColor = onSurface
                             xAxis.setGranularity(1f)
                             xAxis.setLabelRotationAngle(-20f)
                             setFitBars(true)
@@ -470,10 +479,11 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                         view.data = com.github.mikephil.charting.data.BarData(set).apply {
                             setDrawValues(true)
                             setValueTextSize(9f)
-                            setValueTextColor(android.graphics.Color.DKGRAY)
+                            setValueTextColor(onSurface)
                             setValueFormatter(object : com.github.mikephil.charting.formatter.ValueFormatter() {
                                 override fun getBarLabel(barEntry: com.github.mikephil.charting.data.BarEntry?): String {
-                                    return "${barEntry?.y?.toInt() ?: 0}%"
+                                    val v = barEntry?.y?.toInt() ?: 0
+                                    return "${FormatUtils.formatInt(v)}%"
                                 }
                             })
                             barWidth = 0.6f
@@ -503,7 +513,8 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                                 drawRect(color = Color(colors[idx % colors.size]))
                             }
                             Spacer(Modifier.width(6.dp))
-                            Text("$label: ${"%.0f".format(pct)}%", style = MaterialTheme.typography.labelMedium)
+                            val pctInt = pct.toInt()
+                            Text("$label: ${FormatUtils.formatInt(pctInt)}%", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }

@@ -24,7 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.example.wealthtracker.R
+import com.ss.wealthtracker.R
 import com.google.android.gms.ads.AdSize
 import kotlin.math.pow
 

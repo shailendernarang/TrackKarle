@@ -1,19 +1,45 @@
 package com.example.wealthtracker.util
 
 import java.text.NumberFormat
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 object FormatUtils {
-    private val inLocale = Locale("en", "IN")
-    private val currency: NumberFormat = NumberFormat.getCurrencyInstance(inLocale).apply {
-        maximumFractionDigits = 2
-        minimumFractionDigits = 0
+    @Volatile private var useHindiNumerals: Boolean = false
+
+    fun setUseHindiNumerals(enabled: Boolean) {
+        useHindiNumerals = enabled
+    }
+
+    private fun currency(): NumberFormat {
+        val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
+        val nf = NumberFormat.getCurrencyInstance(loc).apply {
+            maximumFractionDigits = 2
+            minimumFractionDigits = 0
+        }
+        if (useHindiNumerals && nf is DecimalFormat) {
+            val dfs = DecimalFormatSymbols(loc).apply {
+                // Set Devanagari digits
+                zeroDigit = '\u0966' // ०
+            }
+            nf.decimalFormatSymbols = dfs
+        }
+        return nf
     }
 
     fun formatINR(amount: Double): String {
-        // NumberFormat includes currency symbol; ensure it is the rupee sign
-        val s = currency.format(amount)
-        return s
+        return currency().format(amount)
+    }
+
+    fun formatInt(value: Int): String {
+        val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
+        val nf = NumberFormat.getIntegerInstance(loc)
+        if (useHindiNumerals && nf is DecimalFormat) {
+            val dfs = DecimalFormatSymbols(loc).apply { zeroDigit = '\u0966' }
+            nf.decimalFormatSymbols = dfs
+        }
+        return nf.format(value)
     }
 }
 

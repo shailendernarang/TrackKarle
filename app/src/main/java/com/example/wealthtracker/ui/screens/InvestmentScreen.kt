@@ -20,12 +20,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.SnackbarHost
@@ -39,7 +40,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -65,6 +66,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -104,6 +107,7 @@ import com.example.wealthtracker.util.InvestmentTypes
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.ExperimentalComposeUiApi
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.AnnotatedString
@@ -124,7 +128,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.Color as GColor
 import java.io.File
 import java.io.FileOutputStream
-import com.example.wealthtracker.R
+import com.ss.wealthtracker.R
 
 private fun formatIndianNumber(input: String): String {
     val clean = input.replace(",", "").trim()
@@ -139,6 +143,8 @@ private fun formatIndianNumber(input: String): String {
     if (decPart.isNotEmpty()) res += "." + decPart.take(2)
     return res
 }
+
+// Encrypted backup/restore removed: database is now encrypted at rest via SQLCipher.
 
 @Composable
 private fun ChartSection(
@@ -174,6 +180,9 @@ private fun ChartSection(
                     Text("No data to visualize", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
+                // Resolve dynamic text colors based on theme
+                val onSurface = MaterialTheme.colorScheme.onSurface.toArgb()
+                val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
                 AndroidView(
                 factory = { context ->
                     if (vizType == "Pie") {
@@ -186,6 +195,7 @@ private fun ChartSection(
                             setHoleColor(android.graphics.Color.TRANSPARENT)
                             setTouchEnabled(false)
                             setExtraOffsets(8f, 8f, 8f, 8f)
+                            setCenterTextColor(onSurface)
                         }
                         chart
                     } else {
@@ -197,6 +207,9 @@ private fun ChartSection(
                             xAxis.position = com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM
                             xAxis.setDrawGridLines(false)
                             axisLeft.setDrawGridLines(true)
+                            // Axis/label text colors for theme
+                            xAxis.textColor = onSurface
+                            axisLeft.textColor = onSurface
                             xAxis.setGranularity(1f)
                             xAxis.setLabelRotationAngle(-20f)
                             setFitBars(true)
@@ -221,7 +234,9 @@ private fun ChartSection(
                             this.colors = colors
                         }
                         view.data = com.github.mikephil.charting.data.BarData(set).apply {
-                            setDrawValues(false)
+                            setDrawValues(true)
+                            setValueTextSize(9f)
+                            setValueTextColor(onSurface)
                             setBarWidth(0.6f)
                         }
                         // X labels
@@ -291,7 +306,7 @@ private fun TotalsBar(items: List<InvestmentEntity>) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "${items.size}",
+                    FormatUtils.formatInt(items.size),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                 )
             }
@@ -299,13 +314,20 @@ private fun TotalsBar(items: List<InvestmentEntity>) {
     }
 }
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun InvestmentScreen(
     viewModel: InvestmentViewModel = hiltViewModel(),
     onOpenDashboard: () -> Unit = {},
     onOpenCalculators: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onBack: () -> Unit = {},
-    showBack: Boolean = true
+    showBack: Boolean = true,
+    onToggleDarkMode: () -> Unit = {},
+    requireDeviceLock: Boolean = false,
+    onToggleRequireDeviceLock: () -> Unit = {},
+    useHindiNumerals: Boolean = false,
+    onToggleHindiNumerals: () -> Unit = {}
 ) {
     val items by viewModel.filteredInvestments.collectAsState()
     val allItems by viewModel.investments.collectAsState()
@@ -314,10 +336,10 @@ fun InvestmentScreen(
     val snackbar = remember { SnackbarHostState() }
     var editing by remember { mutableStateOf<InvestmentEntity?>(null) }
     var editType by remember { mutableStateOf("") }
-    var editAmount by remember { mutableStateOf("") }
+    var editAmount by remember { mutableStateOf(TextFieldValue("")) }
     var editInvType by remember { mutableStateOf(if (InvestmentTypes.all.contains("Others")) "Others" else InvestmentTypes.all.first()) }
     var editBank by remember { mutableStateOf<String?>(null) }
-    var amount by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf(TextFieldValue("")) }
     var invType by remember { mutableStateOf(if (InvestmentTypes.all.contains("FD")) "FD" else InvestmentTypes.all.first()) }
     var othersName by remember { mutableStateOf("") }
     var bankExpanded by remember { mutableStateOf(false) }
@@ -326,18 +348,24 @@ fun InvestmentScreen(
     var highlightId by remember { mutableStateOf<Long?>(null) }
     var pendingAddHighlight by remember { mutableStateOf(false) }
     var showCelebration by remember { mutableStateOf(false) }
-    var vizType by remember { mutableStateOf("Pie") } // Pie or Bar
 
-    val amountError = amount.isNotBlank() && (amount.replace(",", "").toDoubleOrNull()?.let { it <= 0.0 } != false)
+    val amountError = amount.text.isNotBlank() && (amount.text.replace(",", "").toDoubleOrNull()?.let { it <= 0.0 } != false)
     var attemptedAdd by remember { mutableStateOf(false) }
     val bankError = attemptedAdd && invType == "FD" && (selectedBank == null)
     val othersNameError = attemptedAdd && invType == "Others" && othersName.isBlank()
 
-    var menuOpen by remember { mutableStateOf(false) }
-    val clipboard = LocalClipboardManager.current
+    // Overflow menu removed; use dedicated Settings icon in top bar
+    var lastDeleted by remember { mutableStateOf<InvestmentEntity?>(null) }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val uiScope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+
+    // Preserve cursor while applying Indian grouping formatting
+    fun formatIndianNumberTF(input: TextFieldValue): TextFieldValue {
+        val formatted = formatIndianNumber(input.text)
+        return TextFieldValue(formatted, selection = TextRange(formatted.length))
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -367,12 +395,12 @@ fun InvestmentScreen(
             TopAppBar(
                 navigationIcon = {
                     if (showBack) {
-                        IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                     }
                 },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        val comp by rememberLottieComposition(LottieCompositionSpec.RawRes(com.example.wealthtracker.R.raw.money_transfer))
+                        val comp by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_transfer))
                         Box(modifier = Modifier.height(56.dp).width(56.dp)) {
                             if (comp != null) {
                                 LottieAnimation(
@@ -384,57 +412,22 @@ fun InvestmentScreen(
                             }
                         }
                         Column {
-                            Text("Investments", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("Track your investments", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.title_investments), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(stringResource(R.string.subtitle_investments), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 },
                 actions = {
                     // Dashboard button with icon + text
                     FilledTonalButton(onClick = onOpenDashboard) {
-                        Icon(Icons.Default.TrendingUp, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("View Dashboard")
+                        Text(stringResource(R.string.cta_view_dashboard))
                     }
                     // Quick CTA to calculators
                     IconButton(onClick = onOpenCalculators) { Icon(Icons.Default.Calculate, contentDescription = "Calculators") }
-                    // Anchor menu to the 3-dot icon using a Box
-                    val ctx = androidx.compose.ui.platform.LocalContext.current
-                    if (allItems.isNotEmpty()) {
-                        Box {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                            }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(text = { Text("Share CSV") }, onClick = {
-                                    menuOpen = false
-                                    val file = createCsvFile(ctx, items)
-                                    val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/csv"
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        putExtra(Intent.EXTRA_SUBJECT, "Investments CSV - TrackKarle")
-                                        putExtra(Intent.EXTRA_TEXT, "Shared via TrackKarle — Private • Offline • No cloud sync")
-                                    }
-                                    ctx.startActivity(Intent.createChooser(intent, "Share CSV"))
-                                })
-                                DropdownMenuItem(text = { Text("Share PDF") }, onClick = {
-                                    menuOpen = false
-                                    val file = createPdfFile(ctx, items)
-                                    val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "application/pdf"
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        putExtra(Intent.EXTRA_SUBJECT, "Investments PDF - TrackKarle")
-                                        putExtra(Intent.EXTRA_TEXT, "Shared via TrackKarle — Private • Offline • No cloud sync")
-                                    }
-                                    ctx.startActivity(Intent.createChooser(intent, "Share PDF"))
-                                })
-                            }
-                        }
-                    }
+                    // Settings icon
+                    IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = stringResource(id = R.string.settings)) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
@@ -487,7 +480,7 @@ fun InvestmentScreen(
                     val icon = when (key) {
                         "All" -> Icons.Default.Savings
                         "FD" -> Icons.Default.AccountBalance
-                        "Mutual Fund", "NPS", "Equity" -> Icons.Default.TrendingUp
+                        "Mutual Fund", "NPS", "Equity" -> Icons.AutoMirrored.Filled.TrendingUp
                         "Gold" -> Icons.Default.Savings
                         "PPF", "EPF" -> Icons.Default.AccountBalance
                         "Term Insurance", "Health Insurance" -> Icons.Default.Savings
@@ -496,7 +489,7 @@ fun InvestmentScreen(
                     FilterChip(
                         selected = selected,
                         onClick = { viewModel.setTypeFilter(if (key == "All") null else key) },
-                        label = { Text("$display ($count)") },
+                        label = { Text("$display (${FormatUtils.formatInt(count)})") },
                         leadingIcon = { Icon(icon, contentDescription = null) },
                         colors = FilterChipDefaults.filterChipColors()
                     )
@@ -512,20 +505,20 @@ fun InvestmentScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = amount,
-                            onValueChange = { amount = formatIndianNumber(it) },
-                            label = { Text("Amount (₹)") },
+                            onValueChange = { tf -> amount = formatIndianNumberTF(tf) },
+                            label = { Text(stringResource(R.string.label_amount)) },
                             singleLine = true,
                             isError = amountError,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.weight(1f)
                         )
                     }
                     if (amountError) {
-                        Text("Enter a valid amount greater than 0", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.error_enter_valid_amount), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(Modifier.height(12.dp))
                     Column {
-                        Text("Investment Type", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -537,11 +530,11 @@ fun InvestmentScreen(
                                 FilterChip(
                                     selected = selectedAdd,
                                     onClick = { invType = t; if (t != "FD") selectedBank = null },
-                                    label = { Text(if (t == "FD") "Fixed Deposit" else t) },
+                                    label = { Text(if (t == "FD") stringResource(R.string.fixed_deposit) else t) },
                                     leadingIcon = {
                                         val icon = when (t) {
                                             "FD" -> Icons.Default.AccountBalance
-                                            "Mutual Fund", "NPS", "Equity" -> Icons.Default.TrendingUp
+                                            "Mutual Fund", "NPS", "Equity" -> Icons.AutoMirrored.Filled.TrendingUp
                                             "Gold" -> Icons.Default.Savings
                                             "PPF", "EPF" -> Icons.Default.AccountBalance
                                             "Term Insurance", "Health Insurance" -> Icons.Default.Savings
@@ -562,15 +555,15 @@ fun InvestmentScreen(
                                 OutlinedTextField(
                                     value = othersName,
                                     onValueChange = { othersName = it },
-                                    label = { Text("Investment Name") },
-                                    placeholder = { Text("e.g., US Stocks, Crypto, Bonds") },
+                                    label = { Text(stringResource(R.string.name_investment)) },
+                                    placeholder = { Text(stringResource(R.string.hint_investment_name)) },
                                     isError = othersNameError,
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                                 if (othersNameError) {
                                     Text(
-                                        "Please enter an investment name for Others",
+                                        stringResource(R.string.error_enter_name_others),
                                         color = MaterialTheme.colorScheme.error,
                                         style = MaterialTheme.typography.bodySmall
                                     )
@@ -586,7 +579,7 @@ fun InvestmentScreen(
                             OutlinedTextField(
                                 value = selectedBank ?: "Select Bank",
                                 onValueChange = {},
-                                label = { Text("Bank") },
+                                label = { Text(stringResource(R.string.label_bank)) },
                                 isError = bankError,
                                 readOnly = true,
                                 trailingIcon = { IconButton(onClick = { bankExpanded = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } },
@@ -599,19 +592,15 @@ fun InvestmentScreen(
                                 onDismissRequest = { bankExpanded = false },
                                 offset = androidx.compose.ui.unit.DpOffset(0.dp, 8.dp)
                             ) {
-                                DropdownMenuItem(text = { Text("Others") }, onClick = { selectedBank = "Others"; bankExpanded = false })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.menu_others)) }, onClick = { selectedBank = "Others"; bankExpanded = false })
                                 IndianBanks.all.forEach { bank ->
-                                    DropdownMenuItem(
-                                        leadingIcon = { BankAvatar(bank) },
-                                        text = { Text(bank) },
-                                        onClick = { selectedBank = bank; bankExpanded = false }
-                                    )
+                                    DropdownMenuItem(leadingIcon = { BankAvatar(bank) }, text = { Text(bank) }, onClick = { selectedBank = bank; bankExpanded = false })
                                 }
                             }
                         }
                     }
                     if (invType == "FD" && bankError) {
-                        Text("Select a bank for Fixed Deposit", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.error_select_bank_fd), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -619,39 +608,39 @@ fun InvestmentScreen(
                             attemptedAdd = true
                             focusManager.clearFocus()
                             keyboard?.hide()
-                            viewModel.addInvestment(amount.replace(",", ""), invType, selectedBank, if (invType == "Others") othersName else null)
-                            val amountValue = amount.replace(",", "").toDoubleOrNull()
+                            viewModel.addInvestment(amount.text.replace(",", ""), invType, selectedBank, if (invType == "Others") othersName else null)
+                            val amountValue = amount.text.replace(",", "").toDoubleOrNull()
                             val canAdd = amountValue != null && amountValue > 0.0 &&
                                 !(invType == "FD" && selectedBank == null) &&
                                 !(invType == "Others" && othersName.isBlank())
                             if (canAdd) {
-                                amount = ""
+                                amount = TextFieldValue("")
                                 selectedBank = null
                                 attemptedAdd = false
                                 if (invType == "Others") othersName = ""
                                 pendingAddHighlight = true
                             }
-                        }) { Text("Add Investment") }
+                        }) { Text(stringResource(R.string.btn_add_investment)) }
                         Spacer(Modifier.weight(1f))
                         FilledTonalButton(onClick = { viewModel.deleteAll() }, enabled = items.isNotEmpty()) {
                             Icon(Icons.Default.Delete, contentDescription = null)
                             Spacer(Modifier.width(6.dp))
-                            Text("Delete All")
+                            Text(stringResource(R.string.btn_delete_all))
                         }
                     }
                 }
             }
 
             Spacer(Modifier.height(16.dp))
-            Text("Your investments", style = MaterialTheme.typography.titleMedium)
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            Text(stringResource(R.string.section_your_investments), style = MaterialTheme.typography.titleMedium)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             if (items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
-                        Text("No investments yet", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.empty_no_investments), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
@@ -661,14 +650,26 @@ fun InvestmentScreen(
                     state = listState
                 ) {
                     items(items, key = { item -> item.id }) { item ->
-                        Box(modifier = Modifier.animateItemPlacement()) {
+                        Box(modifier = Modifier.animateItem()) {
                             InvestmentRow(
                                 entity = item,
-                                onDelete = { viewModel.delete(item) },
+                                onDelete = {
+                                    val toDelete = item
+                                    viewModel.delete(toDelete)
+                                    lastDeleted = toDelete
+                                    uiScope.launch {
+                                        val res = snackbar.showSnackbar(ctx.getString(R.string.snackbar_deleted), actionLabel = ctx.getString(R.string.action_undo))
+                                        if (res == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                            lastDeleted?.let { viewModel.reAdd(it) }
+                                            lastDeleted = null
+                                        }
+                                    }
+                                },
                                 onEdit = {
                                     editing = item
                                     editType = item.type
-                                    editAmount = formatIndianNumber(item.amount.toString())
+                                    val amtStr = java.math.BigDecimal(item.amount).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                                    editAmount = formatIndianNumberTF(TextFieldValue(amtStr))
                                     editInvType = item.investmentType
                                     editBank = item.bankName
                                 },
@@ -676,7 +677,7 @@ fun InvestmentScreen(
                                 onHighlightConsumed = { if (highlightId == item.id) highlightId = null }
                             )
                         }
-                        Divider()
+                        HorizontalDivider()
                     }
                 }
             }
@@ -688,23 +689,23 @@ fun InvestmentScreen(
                     confirmButton = {
                         TextButton(onClick = {
                             editing?.let { current ->
-                                viewModel.updateInvestment(current.id, editType, editAmount.replace(",", ""), editInvType, editBank)
+                                viewModel.updateInvestment(current.id, editType, editAmount.text.replace(",", ""), editInvType, editBank)
                                 uiScope.launch {
                                     delay(50)
                                     highlightId = current.id
                                 }
                             }
                             editing = null
-                        }) { Text("Save") }
+                        }) { Text(stringResource(R.string.action_save)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { editing = null }) { Text("Cancel") }
+                        TextButton(onClick = { editing = null }) { Text(stringResource(R.string.action_cancel)) }
                     },
-                    title = { Text("Edit Investment") },
+                    title = { Text(stringResource(R.string.dlg_title_edit_investment)) },
                     text = {
                         Column {
                             // Type chips in edit
-                            Text("Investment Type", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Row(
                                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -714,11 +715,11 @@ fun InvestmentScreen(
                                     FilterChip(
                                         selected = selectedEdit,
                                         onClick = { editInvType = t; if (t != "FD") editBank = null },
-                                        label = { Text(if (t == "FD") "Fixed Deposit" else t) },
+                                        label = { Text(if (t == "FD") stringResource(R.string.fixed_deposit) else t) },
                                         leadingIcon = {
                                             val icon = when (t) {
                                                 "FD" -> Icons.Default.AccountBalance
-                                                "Mutual Fund", "NPS", "Equity" -> Icons.Default.TrendingUp
+                                                "Mutual Fund", "NPS", "Equity" -> Icons.AutoMirrored.Filled.TrendingUp
                                                 "Gold" -> Icons.Default.Savings
                                                 "PPF", "EPF" -> Icons.Default.AccountBalance
                                                 "Term Insurance", "Health Insurance" -> Icons.Default.Savings
@@ -734,8 +735,8 @@ fun InvestmentScreen(
                                 OutlinedTextField(
                                     value = editType,
                                     onValueChange = { editType = it },
-                                    label = { Text("Investment Name") },
-                                    placeholder = { Text("e.g., US Stocks, Crypto, Bonds") },
+                                    label = { Text(stringResource(R.string.name_investment)) },
+                                    placeholder = { Text(stringResource(R.string.hint_investment_name)) },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -747,8 +748,8 @@ fun InvestmentScreen(
                                     OutlinedTextField(
                                         value = editBank ?: "Select Bank",
                                         onValueChange = {},
+                                        label = { Text(stringResource(R.string.label_bank)) },
                                         readOnly = true,
-                                        label = { Text("Bank") },
                                         trailingIcon = { IconButton(onClick = { editBankExpanded = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } },
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -770,7 +771,7 @@ fun InvestmentScreen(
                             // Removed display name field as requested
                             OutlinedTextField(
                                 value = editAmount,
-                                onValueChange = { editAmount = formatIndianNumber(it) },
+                                onValueChange = { tf -> editAmount = formatIndianNumberTF(tf) },
                                 label = { Text("Amount") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

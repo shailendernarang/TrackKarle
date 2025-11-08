@@ -27,4 +27,8 @@ interface InvestmentDao {
 
     @Query("DELETE FROM investments")
     suspend fun deleteAll()
+
+    // One-shot query used for migration from unencrypted to encrypted DB
+    @Query("SELECT * FROM investments")
+    suspend fun getAllOnce(): List<InvestmentEntity>
 }
