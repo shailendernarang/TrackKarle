@@ -33,7 +33,13 @@ class InvestmentViewModel @Inject constructor(
     val filteredInvestments: StateFlow<List<InvestmentEntity>> =
         combine(investments, _typeFilter) { list, filter ->
             val sorted = list.sortedByDescending { it.createdAt }
-            if (filter.isNullOrBlank() || filter == "All") sorted else sorted.filter { it.investmentType == filter }
+            val f = when (filter) { "Equity" -> "Stocks"; else -> filter }
+            if (f.isNullOrBlank() || f == "All") sorted else {
+                sorted.filter {
+                    val t = if (it.investmentType == "Equity") "Stocks" else it.investmentType
+                    t == f
+                }
+            }
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val totalCount: StateFlow<Int> = investments.map { it.size }
@@ -43,7 +49,7 @@ class InvestmentViewModel @Inject constructor(
         list.sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
 
-    fun setTypeFilter(type: String?) { _typeFilter.value = type }
+    fun setTypeFilter(type: String?) { _typeFilter.value = if (type == "Equity") "Stocks" else type }
 
     // Snackbars/events
     private val _message = MutableStateFlow<String?>(null)
@@ -82,6 +88,11 @@ class InvestmentViewModel @Inject constructor(
         _message.value = "Cleared"
     }
 
+    fun deleteByIds(ids: List<Long>) {
+        viewModelScope.launch { repo.deleteByIds(ids) }
+        _message.value = "Cleared"
+    }
+
     fun reAdd(entity: InvestmentEntity) {
         viewModelScope.launch {
             repo.addInvestment(
@@ -91,6 +102,13 @@ class InvestmentViewModel @Inject constructor(
                 bankName = entity.bankName
             )
             _message.value = "Restored"
+        }
+    }
+
+    fun addInvestmentFull(entity: InvestmentEntity) {
+        viewModelScope.launch {
+            repo.addInvestmentFull(entity)
+            _message.value = "Added"
         }
     }
 

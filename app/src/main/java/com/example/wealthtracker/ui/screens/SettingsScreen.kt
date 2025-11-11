@@ -19,9 +19,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ss.wealthtracker.R
+import android.content.Intent
+import android.net.Uri
+import com.ss.wealthtracker.BuildConfig
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +49,7 @@ fun SettingsScreen(
             )
         }
     ) { inner ->
+        val ctx = LocalContext.current
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -69,6 +74,21 @@ fun SettingsScreen(
                 checked = useHindiNumerals,
                 onToggle = onToggleHindiNumerals
             )
+            HorizontalDivider()
+            // App info
+            val appName = try {
+                val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, 0)
+                ctx.packageManager.getApplicationLabel(ai).toString()
+            } catch (e: Exception) { "TrackKaro" }
+            val version = BuildConfig.VERSION_NAME
+            Text("App", style = MaterialTheme.typography.titleMedium)
+            Text("$appName v$version", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Privacy Policy link
+            androidx.compose.material3.TextButton(onClick = {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://sites.google.com/view/trackkarle/home"))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { ctx.startActivity(intent) }
+            }) { Text("Privacy Policy") }
         }
     }
 }

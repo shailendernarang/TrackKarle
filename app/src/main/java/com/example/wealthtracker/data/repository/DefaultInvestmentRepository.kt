@@ -21,6 +21,10 @@ class DefaultInvestmentRepository @Inject constructor(
         )
     }
 
+    override suspend fun addInvestmentFull(entity: InvestmentEntity) {
+        dao.insert(entity)
+    }
+
     override suspend fun deleteInvestment(entity: InvestmentEntity) {
         dao.delete(entity)
     }

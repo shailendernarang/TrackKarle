@@ -12,6 +12,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.*
@@ -71,10 +72,11 @@ private val TENURE_ORDER = listOf("1y", "1y 4m", "1y 6m", "2y", "3y", "5y")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showBack: Boolean = true) {
-    val tabs = listOf("SIP", "Lumpsum", "FD", "PPF/EPF")
+    val tabs = listOf("FD", "SIP", "Lump- Sum", "PPF/EPF")
     val initialIndex = when (initialTab?.lowercase()) {
-        "fd" -> 2
-        "lumpsum" -> 1
+        "fd" -> 0
+        "sip" -> 1
+        "lumpsum", "lump-sum", "lump- sum" -> 2
         "ppf", "epf" -> 3
         else -> 0
     }
@@ -88,7 +90,7 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.Calculate, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     }
                 }
@@ -101,25 +103,31 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 .padding(inner)
                 .padding(16.dp)
         ) {
-            // AdMob Adaptive Anchored banner at top
             val ctx = LocalContext.current
-            val dm = ctx.resources.displayMetrics
-            val adWidthDp = (dm.widthPixels / dm.density).toInt()
-            val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
-            val adaptiveHeightDp = adaptiveSize.getHeightInPixels(ctx) / dm.density
-            AndroidView(
-                factory = { context ->
-                    com.google.android.gms.ads.AdView(context).apply {
-                        setAdSize(adaptiveSize)
+            // AdMob Adaptive Anchored banner at top (render only when loaded)
+            run {
+                var adLoaded by remember { mutableStateOf(false) }
+                val adView = remember {
+                    com.google.android.gms.ads.AdView(ctx).apply {
                         adUnitId = "ca-app-pub-4934815537317220/1418248826"
-                        loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(adaptiveHeightDp.dp)
-            )
-            Spacer(Modifier.height(8.dp))
+                }
+                LaunchedEffect(Unit) {
+                    val dm = ctx.resources.displayMetrics
+                    val adWidthDp = (dm.widthPixels / dm.density).toInt()
+                    val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
+                    adView.setAdSize(adaptiveSize)
+                    adView.adListener = object : com.google.android.gms.ads.AdListener() {
+                        override fun onAdLoaded() { adLoaded = true }
+                        override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { adLoaded = false }
+                    }
+                    adView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
+                }
+                if (adLoaded) {
+                    AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
             TabRow(selectedTabIndex = pagerState.currentPage) {
                 tabs.forEachIndexed { i, t ->
                     Tab(
@@ -138,9 +146,9 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 modifier = Modifier.fillMaxWidth().weight(1f)
             ) { page ->
                 when (page) {
-                    0 -> SipCalculator()
-                    1 -> LumpsumCalculator()
-                    2 -> FdCalculator(fdRateRows)
+                    0 -> FdCalculator(fdRateRows)
+                    1 -> SipCalculator()
+                    2 -> LumpsumCalculator()
                     else -> PpfEpfCalculator()
                 }
             }
@@ -268,7 +276,7 @@ fun LumpsumCalculator() {
     val future = p * (1 + r).pow(n)
     val gain = (future - p).coerceAtLeast(0.0)
 
-    Section("Lumpsum Calculator") {
+    Section("Lump- Sum Calculator") {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             NumberField("Amount (₹)", amount) { amount = it }
             Spacer(Modifier.height(8.dp))

@@ -1,3 +1,41 @@
+## Keep Retrofit interfaces and models, OkHttp, and Gson to avoid breaking release networking
+-keepattributes Signature
+-keepattributes Exceptions
+-keepattributes RuntimeVisibleAnnotations, RuntimeInvisibleAnnotations, RuntimeVisibleParameterAnnotations, RuntimeInvisibleParameterAnnotations
+-keepattributes MethodParameters
+
+# Retrofit
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
+-keep interface retrofit2.** { *; }
+
+# Retrofit annotations may reference javax.annotation
+-dontwarn javax.annotation.**
+
+# OkHttp/Okio
+-dontwarn okhttp3.**
+-keep class okhttp3.** { *; }
+-dontwarn okio.**
+
+# Gson
+-keep class com.google.gson.** { *; }
+-dontwarn sun.misc.**
+
+# Our network DTOs and service (Yahoo Finance API models)
+-keep class com.example.wealthtracker.network.** { *; }
+-keep interface com.example.wealthtracker.network.StocksService
+-keepclassmembers class com.example.wealthtracker.network.** { *; }
+## Ensure Retrofit HTTP method annotations on our interfaces are preserved
+-keepclassmembers interface com.example.wealthtracker.network.** {
+    @retrofit2.http.* <methods>;
+}
+
+# Kotlin coroutines metadata
+-dontwarn org.jetbrains.annotations.**
+-dontwarn kotlinx.coroutines.**
+-keep class kotlin.Metadata { *; }
+-keep class kotlin.coroutines.** { *; }
+
 ###############################
 # General debug friendliness  #
 ###############################

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">ट्रैककरले</string>
+    <string name="app_name">TrackKaro</string>
     <string name="share_csv">CSV साझा करें</string>
     <string name="share_pdf">PDF साझा करें</string>
     <string name="require_device_lock_on">डिवाइस लॉक आवश्यक: चालू</string>

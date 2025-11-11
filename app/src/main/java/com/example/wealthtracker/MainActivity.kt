@@ -21,6 +21,9 @@ import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +84,8 @@ import android.app.KeyguardManager
 import android.provider.Settings
 import android.content.Intent
 import android.app.Activity.RESULT_OK
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import android.content.pm.ApplicationInfo
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -136,12 +141,15 @@ class MainActivity : AppCompatActivity() {
                             // Skip splash delay when launched from a notification
                             showComposeSplash = false
                         } else {
-                            delay(2200) // keep visible but < 3s total including system splash
+                            // Faster splash to reduce perceived sluggishness
+                            delay(1000)
                             showComposeSplash = false
                         }
                     }
                     if (showComposeSplash) {
                         val comp by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_investment))
+                        val cfgTop = androidx.compose.ui.platform.LocalConfiguration.current
+                        val isCompact = cfgTop.screenWidthDp < 600
                         Box(modifier = Modifier.fillMaxSize()) {
                             // Center content: animation + app title
                             androidx.compose.foundation.layout.Column(
@@ -152,24 +160,30 @@ class MainActivity : AppCompatActivity() {
                                     composition = comp,
                                     iterations = Int.MAX_VALUE,
                                     isPlaying = true,
-                                    modifier = Modifier.fillMaxSize(0.35f)
-                                )
-                                val inf = androidx.compose.animation.core.rememberInfiniteTransition(label = "splash_text")
-                                val scale by inf.animateFloat(
-                                    initialValue = 0.96f,
-                                    targetValue = 1.06f,
-                                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                                        animation = androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing),
-                                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                                    ),
-                                    label = "scale"
+                                    modifier = Modifier.fillMaxSize(if (isCompact) 0.28f else 0.35f)
                                 )
                                 if (comp != null) {
+                                    // Force Montserrat explicitly on splash texts
+                                    val montserrat = FontFamily(
+                                        Font(com.ss.wealthtracker.R.font.montserrat_regular, weight = FontWeight.Normal),
+                                        Font(com.ss.wealthtracker.R.font.montserrat_semibold, weight = FontWeight.SemiBold),
+                                        Font(com.ss.wealthtracker.R.font.montserrat_bold, weight = FontWeight.Bold)
+                                    )
                                     androidx.compose.material3.Text(
-                                        text = "TrackKarle",
+                                        text = "TrackKaro",
                                         color = MaterialTheme.colorScheme.primary,
-                                        style = androidx.compose.material3.MaterialTheme.typography.displaySmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                                        modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale)
+                                        style = (
+                                            if (isCompact) androidx.compose.material3.MaterialTheme.typography.headlineLarge
+                                            else androidx.compose.material3.MaterialTheme.typography.displaySmall
+                                        ).copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontFamily = montserrat)
+                                    )
+                                    androidx.compose.material3.Text(
+                                        text = "Nivesh Track Karo",
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                                        style = (
+                                            if (isCompact) androidx.compose.material3.MaterialTheme.typography.titleSmall
+                                            else androidx.compose.material3.MaterialTheme.typography.titleMedium
+                                        ).copy(fontFamily = montserrat)
                                     )
                                 }
                             }
@@ -178,7 +192,10 @@ class MainActivity : AppCompatActivity() {
                                 androidx.compose.material3.Text(
                                     text = "Private • Offline • No cloud sync",
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-                                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                                    style = (
+                                        if (isCompact) androidx.compose.material3.MaterialTheme.typography.bodyMedium
+                                        else androidx.compose.material3.MaterialTheme.typography.titleMedium
+                                    ).copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 24.dp)
@@ -198,7 +215,15 @@ class MainActivity : AppCompatActivity() {
                                             viewModel = vm,
                                             onAddClick = { nav.navigate("invest") },
                                             onOpenInvestments = { nav.navigate("invest") },
-                                            onOpenCalculators = { nav.navigate("calculators?tab=fd") }
+                                            onOpenCalculators = { nav.navigate("calculators?tab=fd") },
+                                            onOpenSettings = { nav.navigate("settings") }
+                                        )
+                                    }
+                                }
+                                composable("stocks") {
+                                    WithLocalizedContext(useHindiNumerals) {
+                                        com.example.wealthtracker.ui.screens.StockAnalysisScreen(
+                                            onBack = { nav.popBackStack() }
                                         )
                                     }
                                 }
@@ -209,6 +234,7 @@ class MainActivity : AppCompatActivity() {
                                             viewModel = vm,
                                             onOpenDashboard = { nav.navigate("dashboard") },
                                             onOpenCalculators = { nav.navigate("calculators") },
+                                            onOpenStocks = { nav.navigate("stocks") },
                                             onOpenSettings = { nav.navigate("settings") },
                                             onBack = { nav.popBackStack() },
                                             showBack = canGoBack,
@@ -229,6 +255,8 @@ class MainActivity : AppCompatActivity() {
                                                 useHindiNumerals = !useHindiNumerals
                                                 FormatUtils.setUseHindiNumerals(useHindiNumerals)
                                                 scope.launch { SettingsStore.setHindiNumerals(applicationContext, useHindiNumerals) }
+                                                val tagNow = if (useHindiNumerals) "hi-IN" else "en-IN"
+                                                pendingLocaleTag = tagNow
                                             }
                                         )
                                     }
@@ -251,7 +279,6 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                                 composable("settings") {
-                                    // Settings stays unlocalized until user returns later
                                     com.example.wealthtracker.ui.screens.SettingsScreen(
                                         darkMode = darkMode,
                                         onToggleDarkMode = {
@@ -271,7 +298,7 @@ class MainActivity : AppCompatActivity() {
                                             useHindiNumerals = !useHindiNumerals
                                             com.example.wealthtracker.util.FormatUtils.setUseHindiNumerals(useHindiNumerals)
                                             scope.launch { com.example.wealthtracker.data.SettingsStore.setHindiNumerals(applicationContext, useHindiNumerals) }
-                                            pendingLocaleTag = if (useHindiNumerals) "hi-IN" else java.util.Locale.getDefault().toLanguageTag()
+                                            pendingLocaleTag = if (useHindiNumerals) "hi-IN" else "en-IN"
                                         },
                                         onBack = { nav.popBackStack() }
                                     )
@@ -356,7 +383,7 @@ private fun rememberStartRoute(fromNotification: Boolean, vm: InvestmentViewMode
 private fun WithLocalizedContext(useHindiNumerals: Boolean, content: @Composable () -> Unit) {
     val base = LocalContext.current
     val localized = remember(useHindiNumerals, base) {
-        val tag = if (useHindiNumerals) "hi-IN" else java.util.Locale.getDefault().toLanguageTag()
+        val tag = if (useHindiNumerals) "hi-IN" else "en-IN"
         val conf = Configuration(base.resources.configuration)
         conf.setLocales(android.os.LocaleList.forLanguageTags(tag))
         base.createConfigurationContext(conf)

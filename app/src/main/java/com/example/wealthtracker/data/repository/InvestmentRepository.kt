@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 interface InvestmentRepository {
     fun observeInvestments(): Flow<List<InvestmentEntity>>
     suspend fun addInvestment(type: String, amount: Double, investmentType: String, bankName: String?)
+    suspend fun addInvestmentFull(entity: InvestmentEntity)
     suspend fun deleteInvestment(entity: InvestmentEntity)
     suspend fun deleteByIds(ids: List<Long>)
     suspend fun deleteAll()

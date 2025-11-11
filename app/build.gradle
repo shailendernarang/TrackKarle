@@ -5,6 +5,7 @@ plugins {
     id 'dagger.hilt.android.plugin'
     id 'org.jetbrains.kotlin.plugin.compose'
     id 'com.google.gms.google-services'
+    id 'com.google.firebase.crashlytics'
 }
 
 def keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -21,13 +22,18 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 279001
-        versionName "27.9.0"
+        versionCode 279004
+        versionName "27.9.2"
+
+        buildConfigField 'String', 'RATES_URL', '"https://example.com/wealthtracker/avg_rates.json"'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
         }
+        ndk {
+        abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
+    }
     }
 
     signingConfigs {
@@ -40,14 +46,26 @@ android {
             }
         }
     }
+    flavorDimensions "dist"
+    productFlavors {
+        secure {
+            dimension "dist"
+        }
+        play {
+            dimension "dist"
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
-            debuggable true
+            debuggable false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
+            }
+            firebaseCrashlytics {
+                mappingFileUploadEnabled true
             }
         }
     }
@@ -60,12 +78,15 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
     // Compose Compiler is provided by the Kotlin Compose plugin (no composeOptions needed)
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
+        // Do not bundle a private libsqlite; rely on system SQLite in Play builds
+        exclude 'lib/**/libsqlite.so'
     }
 }
 
@@ -87,7 +108,6 @@ dependencies {
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.foundation:foundation'
-    implementation 'androidx.compose.foundation:foundation-layout'
     implementation 'androidx.compose.material3:material3'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.compose.material:material-icons-extended'
@@ -114,6 +134,7 @@ dependencies {
     
     // Coil for image loading
     implementation 'io.coil-kt:coil-compose:2.5.0'
+    implementation 'io.coil-kt:coil-svg:2.5.0'
 
     // Lottie for animations
     implementation 'com.airbnb.android:lottie-compose:6.0.1'
@@ -124,6 +145,7 @@ dependencies {
     // Firebase Cloud Messaging
     implementation platform('com.google.firebase:firebase-bom:33.4.0')
     implementation 'com.google.firebase:firebase-messaging-ktx'
+    implementation 'com.google.firebase:firebase-crashlytics-ktx'
 
     // Android 12+ splash screen API (backports behavior)
     implementation 'androidx.core:core-splashscreen:1.0.1'
@@ -132,8 +154,8 @@ dependencies {
     implementation 'androidx.biometric:biometric:1.2.0-alpha05'
     // DataStore for persisting app settings
     implementation 'androidx.datastore:datastore-preferences:1.1.1'
-    // SQLCipher for Room encryption at rest
-    implementation 'net.zetetic:android-database-sqlcipher:4.5.4'
+    // SQLCipher for Room encryption at rest (only in secure flavor)
+    secureImplementation 'net.zetetic:android-database-sqlcipher:4.5.4'
     
     // Testing
     testImplementation 'junit:junit:4.13.2'

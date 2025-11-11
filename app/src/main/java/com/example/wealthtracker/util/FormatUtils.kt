@@ -32,6 +32,21 @@ object FormatUtils {
         return currency().format(amount)
     }
 
+    fun formatINRShort(amount: Double): String {
+        val abs = kotlin.math.abs(amount)
+        return when {
+            abs >= 1_00_00_000 -> {
+                val cr = amount / 1_00_00_000.0
+                String.format(Locale.ENGLISH, "%.2f Cr", cr)
+            }
+            abs >= 1_00_000 -> {
+                val lakh = amount / 1_00_000.0
+                String.format(Locale.ENGLISH, "%.2f L", lakh)
+            }
+            else -> formatINR(amount)
+        }
+    }
+
     fun formatInt(value: Int): String {
         val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
         val nf = NumberFormat.getIntegerInstance(loc)

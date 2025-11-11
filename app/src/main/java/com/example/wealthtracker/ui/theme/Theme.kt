@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
@@ -58,9 +59,13 @@ fun WealthTrackerTheme(
         }
     }
 
+    val cfg = LocalConfiguration.current
+    val isCompact = cfg.screenWidthDp < 600
+    val typeScale = if (isCompact) CompactTypography else Typography
+
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = typeScale,
         content = content
     )
 }
