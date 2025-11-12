@@ -74,6 +74,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -115,6 +116,7 @@ import com.example.wealthtracker.util.InvestmentTypes
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.onFocusChanged
@@ -608,23 +610,28 @@ fun InvestmentScreen(
                     ) {
                         // AdMob Adaptive Anchored banner (collapse on no fill)
                         run {
-                            val ctx = androidx.compose.ui.platform.LocalContext.current
                             var adLoaded by remember { mutableStateOf(false) }
-                            val adView = remember {
+                            val adView = remember(ctx) {
                                 com.google.android.gms.ads.AdView(ctx).apply {
                                     adUnitId = "ca-app-pub-4934815537317220/1418248826"
                                 }
                             }
-                            LaunchedEffect(Unit) {
+                            DisposableEffect(Unit) {
                                 val dm = ctx.resources.displayMetrics
                                 val adWidthDp = (dm.widthPixels / dm.density).toInt()
                                 val adaptiveSize = com.google.android.gms.ads.AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
                                 adView.setAdSize(adaptiveSize)
                                 adView.adListener = object : com.google.android.gms.ads.AdListener() {
                                     override fun onAdLoaded() { adLoaded = true }
-                                    override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { adLoaded = false }
+                                    override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { 
+                                        adLoaded = false
+                                        android.util.Log.e("InvestmentAd", "Ad failed: ${error.message} (${error.code})")
+                                    }
                                 }
                                 adView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
+                                onDispose {
+                                    adView.destroy()
+                                }
                             }
                             if (adLoaded) {
                                 AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
@@ -675,8 +682,49 @@ fun InvestmentScreen(
                     }
                 },
                 actions = {
+                    val ctx = LocalContext.current
+                    var exportMenu by remember { mutableStateOf(false) }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(id = R.string.settings))
+                    }
+                    IconButton(onClick = { exportMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Export")
+                    }
+                    DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Share CSV") },
+                            onClick = {
+                                exportMenu = false
+                                val f = createCsvFile(ctx, items)
+                                val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", f)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                val chooser = Intent.createChooser(intent, "Share CSV").apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                ctx.startActivity(chooser)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share PDF") },
+                            onClick = {
+                                exportMenu = false
+                                val f = createPdfFile(ctx, items)
+                                val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", f)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/pdf"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                val chooser = Intent.createChooser(intent, "Share PDF").apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                ctx.startActivity(chooser)
+                            }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -747,24 +795,36 @@ fun InvestmentScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(8.dp)) {
+                Column(modifier = Modifier.padding(6.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedTextField(
                             value = amount,
                             onValueChange = { tf -> amount = formatIndianNumberTF(tf) },
                             label = { Text(stringResource(R.string.label_amount)) },
+                            placeholder = {
+                                val ph = when (invType) {
+                                    "FD" -> "Enter principal amount"
+                                    "Mutual Fund" -> "Enter investment amount"
+                                    "Stocks", "Equity" -> "Enter invested amount"
+                                    "Gold" -> "Enter purchase amount"
+                                    "PPF", "EPF", "NPS" -> "Enter contribution amount"
+                                    "Health Insurance", "Term Insurance" -> "Enter premium amount"
+                                    else -> "Enter amount"
+                                }
+                                Text(ph)
+                            },
                             singleLine = true,
                             isError = amountError,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp, max = 56.dp)
                         )
                     }
                     if (amountError) {
                         Text(stringResource(R.string.error_enter_valid_amount), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
                     Column {
-                        Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -799,7 +859,7 @@ fun InvestmentScreen(
                                 placeholder = { Text(stringResource(R.string.hint_investment_name)) },
                                 isError = othersNameError,
                                 singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp, max = 56.dp)
                             )
                             if (othersNameError) {
                                 Text(
@@ -810,7 +870,7 @@ fun InvestmentScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     // One-year estimate panel (above CTA)
                     val estimate = computeOneYearEstimate(amount.text, invType, selectedBank)
                     if (estimate != null) {
@@ -875,7 +935,7 @@ fun InvestmentScreen(
                                 singleLine = true,
                                 readOnly = true,
                                 trailingIcon = { IconButton(onClick = { showFdStartPicker = true }) { Icon(Icons.Filled.DateRange, contentDescription = null) } },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().clickable { showFdStartPicker = true }
                             )
                             Spacer(Modifier.height(8.dp))
                             Spacer(Modifier.height(8.dp))
@@ -886,7 +946,7 @@ fun InvestmentScreen(
                                 singleLine = true,
                                 readOnly = true,
                                 trailingIcon = { IconButton(onClick = { showFdMaturityPicker = true }) { Icon(Icons.Filled.DateRange, contentDescription = null) } },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().clickable { showFdMaturityPicker = true }
                             )
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
@@ -894,6 +954,7 @@ fun InvestmentScreen(
                                 onValueChange = { fdRate = it.filter { ch -> ch.isDigit() || ch == '.' } },
                                 label = { Text("Interest Rate (%)") },
                                 singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth()
                             )
                             if (showFdStartPicker) {
@@ -980,7 +1041,7 @@ fun InvestmentScreen(
                                 singleLine = true,
                                 readOnly = true,
                                 trailingIcon = { IconButton(onClick = { showMfDatePicker = true }) { Icon(Icons.Filled.DateRange, contentDescription = null) } },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().clickable { showMfDatePicker = true }
                             )
                             if (showMfDatePicker) {
                                 val dpState = rememberDatePickerState()
@@ -1002,7 +1063,7 @@ fun InvestmentScreen(
                         Column {
                             Spacer(Modifier.height(12.dp))
                             var goldMenu by remember { mutableStateOf(false) }
-                            OutlinedTextField(value = goldType ?: "Select Type", onValueChange = {}, label = { Text("Type") }, readOnly = true, trailingIcon = { IconButton(onClick = { goldMenu = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } }, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = goldType ?: "Select Type", onValueChange = {}, label = { Text("Type") }, readOnly = true, trailingIcon = { IconButton(onClick = { goldMenu = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } }, modifier = Modifier.fillMaxWidth().clickable { goldMenu = true })
                             DropdownMenu(expanded = goldMenu, onDismissRequest = { goldMenu = false }) {
                                 listOf("24K Coins/Bars", "22K Jewellery", "Sovereign Gold Bond", "Gold ETF", "Digital Gold", "Gold Mutual Fund", "Others").forEach { t -> DropdownMenuItem(text = { Text(t) }, onClick = { goldType = t; goldMenu = false }) }
                             }
@@ -1014,7 +1075,7 @@ fun InvestmentScreen(
                                 singleLine = true,
                                 readOnly = true,
                                 trailingIcon = { IconButton(onClick = { showGoldDatePicker = true }) { Icon(Icons.Filled.DateRange, contentDescription = null) } },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().clickable { showGoldDatePicker = true }
                             )
                             if (showGoldDatePicker) {
                                 val dpState = rememberDatePickerState()
@@ -1036,7 +1097,7 @@ fun InvestmentScreen(
                         Column {
                             Spacer(Modifier.height(12.dp))
                             var fyMenu by remember { mutableStateOf(false) }
-                            OutlinedTextField(value = ppfFy ?: "Select FY", onValueChange = {}, label = { Text("FY") }, readOnly = true, trailingIcon = { IconButton(onClick = { fyMenu = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } }, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = ppfFy ?: "Select FY", onValueChange = {}, label = { Text("FY") }, readOnly = true, trailingIcon = { IconButton(onClick = { fyMenu = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } }, modifier = Modifier.fillMaxWidth().clickable { fyMenu = true })
                             DropdownMenu(expanded = fyMenu, onDismissRequest = { fyMenu = false }) {
                                 listOf("FY 2023-24", "FY 2024-25", "FY 2025-26").forEach { f -> DropdownMenuItem(text = { Text(f) }, onClick = { ppfFy = f; fyMenu = false }) }
                             }
@@ -1048,7 +1109,7 @@ fun InvestmentScreen(
                                 singleLine = true,
                                 readOnly = true,
                                 trailingIcon = { IconButton(onClick = { showPpfDatePicker = true }) { Icon(Icons.Filled.DateRange, contentDescription = null) } },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().clickable { showPpfDatePicker = true }
                             )
                             if (showPpfDatePicker) {
                                 val dpState = rememberDatePickerState()
@@ -1070,7 +1131,7 @@ fun InvestmentScreen(
                         Column {
                             Spacer(Modifier.height(12.dp))
                             var tierMenu by remember { mutableStateOf(false) }
-                            OutlinedTextField(value = npsTier ?: "Select Tier", onValueChange = {}, label = { Text("Tier") }, readOnly = true, trailingIcon = { IconButton(onClick = { tierMenu = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } }, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = npsTier ?: "Select Tier", onValueChange = {}, label = { Text("Tier") }, readOnly = true, trailingIcon = { IconButton(onClick = { tierMenu = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } }, modifier = Modifier.fillMaxWidth().clickable { tierMenu = true })
                             DropdownMenu(expanded = tierMenu, onDismissRequest = { tierMenu = false }) {
                                 listOf("Tier I (retirement account)", "Tier II (optional savings)", "Others").forEach { t ->
                                     DropdownMenuItem(text = { Text(t) }, onClick = { npsTier = t; tierMenu = false })
@@ -1088,7 +1149,7 @@ fun InvestmentScreen(
                                 singleLine = true,
                                 readOnly = true,
                                 trailingIcon = { IconButton(onClick = { showNpsDatePicker = true }) { Icon(Icons.Filled.DateRange, contentDescription = null) } },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().clickable { showNpsDatePicker = true }
                             )
                             if (showNpsDatePicker) {
                                 val dpState = rememberDatePickerState()
@@ -1259,6 +1320,7 @@ fun InvestmentScreen(
                                 stockName = ""; stockDate = ""; stockSuggest = emptyList(); stockExpanded = false
                                 attemptedAdd = false
                                 pendingAddHighlight = true
+                                showCelebration = true
                                 viewModel.setTypeFilter(invType)
                             }
                         }) { Text(stringResource(id = R.string.btn_add_investment), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)) }
@@ -1669,18 +1731,65 @@ private fun VisualizationDialog(
 private fun createCsvFile(context: android.content.Context, items: List<InvestmentEntity>): File {
     val cacheDir = File(context.cacheDir, "shares").apply { mkdirs() }
     val file = File(cacheDir, "investments.csv")
-    val header = "S.No,Investment Type,Bank,Added On,Amount\n"
-    val body = items.mapIndexed { idx, e ->
-        listOf(idx + 1, e.investmentType, e.bankName ?: "", formatAddedOn(e.createdAt), FormatUtils.formatINR(e.amount)).joinToString(",") {
-            // escape commas if needed
-            val s = it.toString()
-            if (s.contains(",")) '"' + s.replace("\"", "\"\"") + '"' else s
+    val singleType = items.map { if (it.investmentType == "Equity") "Stocks" else it.investmentType }.distinct().singleOrNull()
+    val (header, rows) = when (singleType) {
+        "FD" -> {
+            val h = "S.No,Bank,Rate,Maturity,Amount\n"
+            val r = items.mapIndexed { idx, e ->
+                listOf(
+                    idx + 1,
+                    e.bankName ?: "FD",
+                    e.fdRate?.let { String.format(java.util.Locale.ENGLISH, "%.2f%%", it) } ?: "",
+                    e.fdMaturityDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt),
+                    FormatUtils.formatINR(e.amount)
+                ).joinToString(",") { s -> val str = s.toString(); if (str.contains(",")) '"' + str.replace("\"", "\"\"") + '"' else str }
+            }
+            h to r
         }
-    }.joinToString("\n")
-    val total = items.sumOf { it.amount }
-    val totalRow = listOf("", "Total", "", "", FormatUtils.formatINR(total)).joinToString(",") { v ->
-        val s = v.toString(); if (s.contains(",")) '"' + s.replace("\"", "\"\"") + '"' else s
+        "Health Insurance" -> {
+            val h = "S.No,Policy,Renewal,Amount\n"
+            val r = items.mapIndexed { idx, e ->
+                listOf(idx + 1, e.hiPolicyName ?: "", e.hiRenewalDate ?: formatAddedOn(e.createdAt), FormatUtils.formatINR(e.amount))
+                    .joinToString(",") { s -> val str = s.toString(); if (str.contains(",")) '"' + str.replace("\"", "\"\"") + '"' else str }
+            }
+            h to r
+        }
+        "Stocks" -> {
+            val h = "S.No,Stock,Date,Amount\n"
+            val r = items.mapIndexed { idx, e ->
+                listOf(idx + 1, (e.stockName ?: e.type).ifBlank { "Stocks" }, e.stockDate ?: formatAddedOn(e.createdAt), FormatUtils.formatINR(e.amount))
+                    .joinToString(",") { s -> val str = s.toString(); if (str.contains(",")) '"' + str.replace("\"", "\"\"") + '"' else str }
+            }
+            h to r
+        }
+        else -> {
+            val h = "S.No,Type,Name,Date,Amount\n"
+            val r = items.mapIndexed { idx, e ->
+                val (name, dateStr) = when (e.investmentType) {
+                    "FD" -> ((e.bankName ?: "Fixed Deposit") to (e.fdMaturityDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)))
+                    "Health Insurance" -> ((e.hiPolicyName?.takeIf { it.isNotBlank() } ?: "Insurance") to (e.hiRenewalDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)))
+                    "Mutual Fund" -> (e.type.ifBlank { "Mutual Fund" } to (e.mfDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)))
+                    "Gold" -> ((e.goldType?.takeIf { it.isNotBlank() } ?: "Gold") to (e.goldDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)))
+                    "PPF" -> ((e.ppfFy?.takeIf { it.isNotBlank() } ?: "PPF") to (e.ppfDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)))
+                    "NPS" -> ((e.npsTier?.takeIf { it.isNotBlank() } ?: "NPS") to (e.npsDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)))
+                    "Equity", "Stocks" -> (((e.stockName?.takeIf { it.isNotBlank() } ?: e.type).ifBlank { "Stocks" }) to (e.stockDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)))
+                    else -> (e.type.ifBlank { e.investmentType } to formatAddedOn(e.createdAt))
+                }
+                listOf(idx + 1, e.investmentType, name, dateStr, FormatUtils.formatINR(e.amount)).joinToString(",") { s ->
+                    val str = s.toString(); if (str.contains(",")) '"' + str.replace("\"", "\"\"") + '"' else str
+                }
+            }
+            h to r
+        }
     }
+    val body = rows.joinToString("\n")
+    val total = items.sumOf { it.amount }
+    val footerCols = header.substringBefore('\n').split(',').size
+    val totalRow = buildList {
+        repeat(footerCols - 2) { add("") }
+        add("Total")
+        add(FormatUtils.formatINR(total))
+    }.joinToString(",") { v -> val s = v.toString(); if (s.contains(",")) '"' + s.replace("\"", "\"\"") + '"' else s }
     file.writeText(header + body + "\n" + totalRow)
     return file
 }
@@ -1695,8 +1804,14 @@ private fun createPdfFile(context: android.content.Context, items: List<Investme
         val pageInfo = PdfDocument.PageInfo.Builder(pageW, pageH, pageNumber).create()
         val page = doc.startPage(pageInfo)
         val canvas = page.canvas
-        // Columns: #, Investment Type, Bank, Added On, Amount | colX[5] as right edge
-        val colX = floatArrayOf(40f, 60f, 230f, 380f, 480f, 555f)
+        val singleType = items.map { if (it.investmentType == "Equity") "Stocks" else it.investmentType }.distinct().singleOrNull()
+        // Dynamic columns based on filter/type
+        val colX = when (singleType) {
+            "FD" -> floatArrayOf(40f, 60f, 250f, 380f, 480f, 555f) // #, Bank, Rate, Maturity, Amount, right edge
+            "Health Insurance" -> floatArrayOf(40f, 60f, 360f, 460f, 520f, 555f) // #, Policy, Renewal, Amount, right edge
+            "Stocks" -> floatArrayOf(40f, 60f, 360f, 460f, 520f, 555f) // #, Stock, Date, Amount, right edge
+            else -> floatArrayOf(40f, 60f, 210f, 380f, 480f, 555f) // #, Type, Name, Date, Amount, right edge
+        }
         return Triple(page, canvas, colX)
     }
 
@@ -1734,25 +1849,7 @@ private fun createPdfFile(context: android.content.Context, items: List<Investme
     var pageNum = 1
     var (page, canvas, colX) = startPage(pageNum)
 
-    fun drawWatermark() {
-        appIconBitmap?.let { bmp ->
-            val save = canvas.save()
-            canvas.rotate(-25f, (pageW/2).toFloat(), (pageH/2).toFloat())
-            val scale = 0.6f
-            val w = (bmp.width * scale).toInt()
-            val h = (bmp.height * scale).toInt()
-            val left = (pageW/2 - w/2).toFloat()
-            val top = (pageH/2 - h/2).toFloat()
-            val p = Paint().apply { alpha = 40 }
-            val rect = android.graphics.Rect(0,0,bmp.width,bmp.height)
-            val dst = android.graphics.Rect(left.toInt(), top.toInt(), left.toInt()+w, top.toInt()+h)
-            canvas.drawBitmap(bmp, rect, dst, p)
-            canvas.restoreToCount(save)
-        }
-    }
-
     fun drawHeader(): Float {
-        drawWatermark()
         // small icon snapshot at top-right
         appIconBitmap?.let { bmp ->
             val size = 32
@@ -1765,11 +1862,32 @@ private fun createPdfFile(context: android.content.Context, items: List<Investme
         var y = 60f
         canvas.drawText("TrackKaro - Investments", 40f, y, titlePaint)
         y += 28f
+        val singleType = items.map { if (it.investmentType == "Equity") "Stocks" else it.investmentType }.distinct().singleOrNull()
         canvas.drawText("#", colX[0], y, headerPaint)
-        canvas.drawText("Investment Type", colX[1], y, headerPaint)
-        canvas.drawText("Bank", colX[2], y, headerPaint)
-        canvas.drawText("Added On", colX[3], y, headerPaint)
-        canvas.drawText("Amount", colX[4], y, headerPaint)
+        when (singleType) {
+            "FD" -> {
+                canvas.drawText("Bank", colX[1], y, headerPaint)
+                canvas.drawText("Rate", colX[2], y, headerPaint)
+                canvas.drawText("Maturity", colX[3], y, headerPaint)
+                canvas.drawText("Amount", colX[4], y, headerPaint)
+            }
+            "Health Insurance" -> {
+                canvas.drawText("Policy", colX[1], y, headerPaint)
+                canvas.drawText("Renewal", colX[2], y, headerPaint)
+                canvas.drawText("Amount", colX[3], y, headerPaint)
+            }
+            "Stocks" -> {
+                canvas.drawText("Stock", colX[1], y, headerPaint)
+                canvas.drawText("Date", colX[2], y, headerPaint)
+                canvas.drawText("Amount", colX[3], y, headerPaint)
+            }
+            else -> {
+                canvas.drawText("Type", colX[1], y, headerPaint)
+                canvas.drawText("Name", colX[2], y, headerPaint)
+                canvas.drawText("Date", colX[3], y, headerPaint)
+                canvas.drawText("Amount", colX[4], y, headerPaint)
+            }
+        }
         y += 12f
         canvas.drawLine(colX[0], y, colX[5], y, textPaint)
         y += 16f
@@ -1777,6 +1895,30 @@ private fun createPdfFile(context: android.content.Context, items: List<Investme
     }
 
     var y = drawHeader()
+
+    fun drawTextWrapped(s: String, x: Float, yStart: Float, maxW: Float, paint: Paint): Float {
+        if (s.isBlank()) { canvas.drawText("", x, yStart, paint); return 0f }
+        val words = s.split(' ')
+        var line = StringBuilder()
+        var y = yStart
+        var used = 0f
+        for (w in words) {
+            val test = if (line.isEmpty()) w else line.toString() + " " + w
+            val width = paint.measureText(test)
+            if (width <= maxW) {
+                line = StringBuilder(test)
+            } else {
+                canvas.drawText(line.toString(), x, y, paint)
+                y += 14f
+                used += 14f
+                line = StringBuilder(w)
+            }
+        }
+        if (line.isNotEmpty()) {
+            canvas.drawText(line.toString(), x, y, paint)
+        }
+        return used
+    }
 
     items.forEachIndexed { idx, e ->
         if (y > pageH - 60f) { // leave more bottom margin
@@ -1788,11 +1930,56 @@ private fun createPdfFile(context: android.content.Context, items: List<Investme
             colX = triple.third
             y = drawHeader()
         }
+        val name = when (e.investmentType) {
+            "FD" -> e.bankName ?: "Fixed Deposit"
+            "Health Insurance" -> e.hiPolicyName?.takeIf { it.isNotBlank() } ?: "Insurance"
+            "Mutual Fund" -> e.type.ifBlank { "Mutual Fund" }
+            "Gold" -> e.goldType?.takeIf { it.isNotBlank() } ?: "Gold"
+            "PPF" -> e.ppfFy?.takeIf { it.isNotBlank() } ?: "PPF"
+            "NPS" -> e.npsTier?.takeIf { it.isNotBlank() } ?: "NPS"
+            "Equity", "Stocks" -> (e.stockName?.takeIf { it.isNotBlank() } ?: e.type).ifBlank { "Stocks" }
+            else -> e.type.ifBlank { e.investmentType }
+        }
+        val dateStr = when (e.investmentType) {
+            "FD" -> e.fdMaturityDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)
+            "Health Insurance" -> e.hiRenewalDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)
+            "Mutual Fund" -> e.mfDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)
+            "Gold" -> e.goldDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)
+            "PPF" -> e.ppfDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)
+            "NPS" -> e.npsDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)
+            "Equity", "Stocks" -> e.stockDate?.takeIf { it.isNotBlank() } ?: formatAddedOn(e.createdAt)
+            else -> formatAddedOn(e.createdAt)
+        }
         canvas.drawText((idx + 1).toString(), colX[0], y, textPaint)
-        canvas.drawText(e.investmentType, colX[1], y, textPaint)
-        canvas.drawText((e.bankName ?: "-"), colX[2], y, textPaint)
-        canvas.drawText(formatAddedOn(e.createdAt), colX[3], y, textPaint)
-        canvas.drawText(FormatUtils.formatINR(e.amount), colX[4], y, textPaint)
+        val singleType = items.map { if (it.investmentType == "Equity") "Stocks" else it.investmentType }.distinct().singleOrNull()
+        when (singleType) {
+            "FD" -> {
+                canvas.drawText(name, colX[1], y, textPaint)
+                canvas.drawText(e.fdRate?.let { String.format(java.util.Locale.ENGLISH, "%.2f%%", it) } ?: "", colX[2], y, textPaint)
+                canvas.drawText(dateStr, colX[3], y, textPaint)
+                canvas.drawText(FormatUtils.formatINR(e.amount), colX[4], y, textPaint)
+            }
+            "Health Insurance" -> {
+                // wrap policy name if long
+                val used = drawTextWrapped(name, colX[1], y, (colX[2] - colX[1] - 6f), textPaint)
+                canvas.drawText(dateStr, colX[2], y, textPaint)
+                canvas.drawText(FormatUtils.formatINR(e.amount), colX[3], y, textPaint)
+                if (used > 0f) y += used
+            }
+            "Stocks" -> {
+                val used = drawTextWrapped(name, colX[1], y, (colX[2] - colX[1] - 6f), textPaint)
+                canvas.drawText(dateStr, colX[2], y, textPaint)
+                canvas.drawText(FormatUtils.formatINR(e.amount), colX[3], y, textPaint)
+                if (used > 0f) y += used
+            }
+            else -> {
+                canvas.drawText(e.investmentType, colX[1], y, textPaint)
+                val used = drawTextWrapped(name, colX[2], y, (colX[3] - colX[2] - 6f), textPaint)
+                canvas.drawText(dateStr, colX[3], y, textPaint)
+                canvas.drawText(FormatUtils.formatINR(e.amount), colX[4], y, textPaint)
+                if (used > 0f) y += used
+            }
+        }
         // increase row height and draw separator below text to avoid overlap
         val sepY = y + 6f
         canvas.drawLine(colX[0], sepY, colX[5], sepY, textPaint)
@@ -1937,8 +2124,27 @@ private fun InvestmentRow(
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier.padding(horizontal = 8.dp)
         )
-        IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = null) }
-        IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = null) }
+        var menuExpanded by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { menuExpanded = true }) { 
+                Icon(Icons.Default.MoreVert, contentDescription = "More options") 
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    onClick = { menuExpanded = false; onEdit() },
+                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = { menuExpanded = false; onDelete() },
+                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) }
+                )
+            }
+        }
     }
 }
 

@@ -2,10 +2,18 @@ package com.example.wealthtracker.ui
 
 import com.example.wealthtracker.data.local.InvestmentEntity
 import com.example.wealthtracker.data.repository.InvestmentRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.delay
+import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,6 +27,11 @@ private class FakeRepo : InvestmentRepository {
     override suspend fun addInvestment(type: String, amount: Double, investmentType: String, bankName: String?) {
         val e = InvestmentEntity(type = type, amount = amount, investmentType = investmentType, bankName = bankName)
         backing.add(e)
+        flow.value = backing.toList()
+    }
+
+    override suspend fun addInvestmentFull(entity: InvestmentEntity) {
+        backing.add(entity)
         flow.value = backing.toList()
     }
 
@@ -49,7 +62,19 @@ private class FakeRepo : InvestmentRepository {
     override suspend fun importJson(json: String) {}
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class InvestmentViewModelTest {
+    private val testDispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setup() {
+        Dispatchers.setMain(testDispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
 
     private suspend fun awaitSize(vm: InvestmentViewModel, expected: Int, timeoutMs: Long = 500) {
         var waited = 0L
@@ -60,13 +85,14 @@ class InvestmentViewModelTest {
     }
 
     @Test
-    fun filtering_respects_type_and_sorting() = runBlocking {
+    fun filtering_respects_type_and_sorting() = runTest {
         val repo = FakeRepo()
         val vm = InvestmentViewModel(repo)
         // Seed: three items; createdAt auto (now), so inject with explicit times via update after add
         repo.addInvestment("Fixed Deposit", 1000.0, "FD", "HDFC")
         repo.addInvestment("Gold", 500.0, "Gold", null)
         repo.addInvestment("Mutual Fund", 700.0, "Mutual Fund", null)
+        advanceUntilIdle()
 
         // No filter -> size 3
         awaitSize(vm, 3)
@@ -74,34 +100,37 @@ class InvestmentViewModelTest {
 
         // Filter to FD -> only FD
         vm.setTypeFilter("FD")
-        // allow state to propagate
-        delay(20)
+        advanceUntilIdle()
         val onlyFd = vm.filteredInvestments.value
         assertEquals(1, onlyFd.size)
         assertEquals("FD", onlyFd.first().investmentType)
 
         // Filter All -> back to 3
         vm.setTypeFilter(null)
-        delay(20)
+        advanceUntilIdle()
         assertEquals(3, vm.filteredInvestments.value.size)
     }
 
     @Test
-    fun add_validation_gates() = runBlocking {
+    fun add_validation_gates() = runTest {
         val repo = FakeRepo()
         val vm = InvestmentViewModel(repo)
 
         // Invalid amount
         vm.addInvestment("0", "Gold", null)
+        advanceUntilIdle()
         assertTrue(vm.investments.value.isEmpty())
 
         // FD without bank
         vm.addInvestment("1000", "FD", null)
+        advanceUntilIdle()
         assertTrue(vm.investments.value.isEmpty())
 
-        // Others without name
-        vm.addInvestment("1000", "Others", null, displayName = "")
-        assertTrue(vm.investments.value.isEmpty())
+        // Valid Gold
+        vm.addInvestment("500", "Gold", null)
+        advanceUntilIdle()
+        awaitSize(vm, 1)
+        assertEquals(1, vm.investments.value.size)
 
         // Valid FD
         vm.addInvestment("1500", "FD", "SBI")

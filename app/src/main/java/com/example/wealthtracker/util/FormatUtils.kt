@@ -47,6 +47,23 @@ object FormatUtils {
         }
     }
 
+    fun formatPercent(value: Double): String {
+        val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
+        val pattern = "#,##0.0%"
+        val df = DecimalFormat(pattern, DecimalFormatSymbols(loc)).apply {
+            maximumFractionDigits = 1
+            minimumFractionDigits = 1
+        }
+        if (useHindiNumerals) {
+            val dfs = df.decimalFormatSymbols
+            dfs.zeroDigit = '\u0966'
+            df.decimalFormatSymbols = dfs
+        }
+        // value is expected as 0..100 or 0..1? We'll accept 0..100 and divide if needed
+        val normalized = if (value > 1.0) value / 100.0 else value
+        return df.format(normalized)
+    }
+
     fun formatInt(value: Int): String {
         val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
         val nf = NumberFormat.getIntegerInstance(loc)

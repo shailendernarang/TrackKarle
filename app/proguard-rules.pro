@@ -63,10 +63,17 @@
 ###############################
 -keep class androidx.room.** { *; }
 -keep @androidx.room.Dao class * { *; }
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Database class * { *; }
 -keepclasseswithmembers class * {
     @androidx.room.* <methods>;
 }
 -keep class * extends androidx.room.RoomDatabase { *; }
+# Keep all Room entities and their fields
+-keep class com.example.wealthtracker.data.local.** { *; }
+-keep class com.ss.wealthtracker.data.local.** { *; }
+-keepclassmembers class com.example.wealthtracker.data.local.** { *; }
+-keepclassmembers class com.ss.wealthtracker.data.local.** { *; }
 
 ###############################
 # Retrofit / OkHttp / Gson    #
@@ -121,6 +128,24 @@
 # ViewModels are often created via reflection in Hilt factories
 -keep class com.example.wealthtracker.ui.**ViewModel { *; }
 -keep class com.ss.wealthtracker.ui.**ViewModel { *; }
+# Keep repositories and data sources
+-keep class com.example.wealthtracker.data.repository.** { *; }
+-keep class com.ss.wealthtracker.data.repository.** { *; }
+# Keep data classes used in the app
+-keep class com.example.wealthtracker.data.** { *; }
+-keep class com.ss.wealthtracker.data.** { *; }
+
+###############################
+# Jetpack Compose            #
+###############################
+-keep class androidx.compose.** { *; }
+-keep @androidx.compose.runtime.Composable class * { *; }
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable *;
+}
+# Keep Compose state holders
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.ui.** { *; }
 
 ###############################
 # SQLCipher (native JNI)       #

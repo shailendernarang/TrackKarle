@@ -22,8 +22,8 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 279004
-        versionName "27.9.2"
+        versionCode 279006
+        versionName "27.9.4"
 
         buildConfigField 'String', 'RATES_URL', '"https://example.com/wealthtracker/avg_rates.json"'
 
@@ -72,6 +72,7 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = '17'
@@ -95,6 +96,7 @@ kapt {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     // Core Android
     implementation 'androidx.core:core-ktx:1.13.1'
@@ -159,6 +161,13 @@ dependencies {
     
     // Testing
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test:1.9.20'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
+    testImplementation 'org.mockito:mockito-core:5.7.0'
+    testImplementation 'org.mockito:mockito-inline:5.2.0'
+    testImplementation 'org.mockito.kotlin:mockito-kotlin:5.1.0'
+    testImplementation 'androidx.arch.core:core-testing:2.2.0'
+    testImplementation "androidx.room:room-testing:2.7.0"
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     androidTestImplementation platform('androidx.compose:compose-bom:2024.10.00')

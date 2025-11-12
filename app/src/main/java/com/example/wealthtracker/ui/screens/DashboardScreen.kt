@@ -7,8 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -18,19 +19,28 @@ import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.material3.HorizontalDivider
+import androidx.activity.compose.BackHandler
+import android.widget.Toast
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalConfiguration
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -42,9 +52,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.wealthtracker.data.local.InvestmentEntity
 import com.example.wealthtracker.ui.InvestmentViewModel
 import com.example.wealthtracker.util.FormatUtils
-import com.example.wealthtracker.util.InvestmentTypes
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class Reminder(
+    val id: String,
+    val title: String,
+    val investmentType: String,
+    val action: String,
+    val whenText: String,
+    val color: Color
+)
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(
     viewModel: InvestmentViewModel = hiltViewModel(),
@@ -56,10 +74,71 @@ fun DashboardScreen(
     val allItems by viewModel.investments.collectAsState()
     val filtered by viewModel.filteredInvestments.collectAsState()
     val typeFilter by viewModel.typeFilter.collectAsState()
+    
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val activity = remember(ctx) { 
+        ctx as? android.app.Activity ?: (ctx as? androidx.appcompat.view.ContextThemeWrapper)?.baseContext as? android.app.Activity
+    }
+    val prefs = remember { ctx.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE) }
+    var showReminderCarousel by rememberSaveable { mutableStateOf(true) }
+    var startupShown by rememberSaveable { mutableStateOf(prefs.getInt("startup_shown", 0)) }
 
     var vizType by remember { mutableStateOf("Pie") }
     val cfgTop = LocalConfiguration.current
     val isWideTop = cfgTop.screenWidthDp >= 700
+
+    // Double-back-to-exit from home (Dashboard)
+    var backPressedOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(backPressedOnce) {
+        if (backPressedOnce) {
+            kotlinx.coroutines.delay(2000)
+            backPressedOnce = false
+        }
+    }
+    BackHandler(enabled = true) {
+        if (!backPressedOnce) {
+            backPressedOnce = true
+            Toast.makeText(ctx, "Press back again to exit", Toast.LENGTH_SHORT).show()
+        } else {
+            activity?.finishAffinity() ?: run {
+                // Fallback if activity is null
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+    }
+    
+    // Upcoming reminders: build list (FD <90d, Insurance <60d)
+    val fdSoonList = allItems.filter { it.investmentType == "FD" }.mapNotNull { e ->
+        e.fdMaturityDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } }
+    }.filter { (date, _) ->
+        val days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), date).toInt()
+        days in 0..90
+    }.sortedBy { it.first }
+    val hiSoonList = allItems.filter { it.investmentType == "Health Insurance" }.mapNotNull { e ->
+        e.hiRenewalDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } }
+    }.filter { (date, _) ->
+        val days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), date).toInt()
+        days in 0..60
+    }.sortedBy { it.first }
+    val ackSet = remember { prefs.getStringSet("ack_ids", emptySet())?.toMutableSet() ?: mutableSetOf() }
+    // Capture colors outside remember to avoid composable reads inside remember
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val reminders = remember(allItems) {
+        buildList {
+            fdSoonList.forEach { (d, e) ->
+                add(Reminder("FD:${e.id}", e.bankName ?: "Fixed Deposit", "Fixed Deposit", "Maturity", formatAddedOnDashboard(d), primaryColor))
+            }
+            hiSoonList.forEach { (d, e) ->
+                add(Reminder("HI:${e.id}", e.hiPolicyName?.takeIf { it.isNotBlank() } ?: "Health Insurance", "Health Insurance", "Renewal", formatAddedOnDashboard(d), tertiaryColor))
+            }
+        }
+            .filter { it.id !in ackSet }
+            .takeIf { it.isNotEmpty() } ?: emptyList()
+    }
+    val canShow = showReminderCarousel && reminders.isNotEmpty() && startupShown < 3
+    
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -84,24 +163,34 @@ fun DashboardScreen(
                 ) {
                     // AdMob Adaptive Anchored banner (collapse on no fill)
                     run {
-                        val ctx = androidx.compose.ui.platform.LocalContext.current
                         var adLoaded by remember { mutableStateOf(false) }
-                        val adView = remember {
+                        val adView = remember(ctx) {
                             com.google.android.gms.ads.AdView(ctx).apply {
                                 adUnitId = "ca-app-pub-4934815537317220/1418248826"
                             }
                         }
-                        LaunchedEffect(Unit) {
+                        
+                        DisposableEffect(Unit) {
                             val dm = ctx.resources.displayMetrics
                             val adWidthDp = (dm.widthPixels / dm.density).toInt()
                             val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
                             adView.setAdSize(adaptiveSize)
                             adView.adListener = object : com.google.android.gms.ads.AdListener() {
-                                override fun onAdLoaded() { adLoaded = true }
-                                override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { adLoaded = false }
+                                override fun onAdLoaded() { 
+                                    adLoaded = true 
+                                }
+                                override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { 
+                                    adLoaded = false
+                                    android.util.Log.e("DashboardAd", "Ad failed to load: ${error.message} (Code: ${error.code})")
+                                }
                             }
                             adView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
+                            
+                            onDispose {
+                                adView.destroy()
+                            }
                         }
+                        
                         if (adLoaded) {
                             AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
                             Spacer(Modifier.height(6.dp))
@@ -147,7 +236,9 @@ fun DashboardScreen(
         } else {
             Modifier.fillMaxSize().padding(inner).padding(16.dp).verticalScroll(rememberScrollState())
         }
-        Column(contentModifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        
+        Box(Modifier.fillMaxSize()) {
+            Column(contentModifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // Filter chips row (dynamic)
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -187,10 +278,10 @@ fun DashboardScreen(
                     modifier = Modifier.weight(1f),
                     title = stringResource(id = com.ss.wealthtracker.R.string.label_investments),
                     value = FormatUtils.formatInt(allItems.size),
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
-
+            
             val cfg = LocalConfiguration.current
             val isWide = cfg.screenWidthDp >= 700
             val insightItems = if (typeFilter.isNullOrBlank()) allItems else filtered
@@ -250,73 +341,248 @@ fun DashboardScreen(
                                                     Text(subtitleBits.joinToString(" • "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                 }
                                             }
-                                            Text(FormatUtils.formatINR(e.amount), fontWeight = FontWeight.Bold)
+                                            Text(FormatUtils.formatINRShort(e.amount), fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    // Bottom half: Insights full width
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                            InsightsSection(insightItems, typeFilter)
-                        }
-                    }
+                    Spacer(Modifier.height(12.dp))
+                    InsightsSection(allItems = insightItems, currentFilter = typeFilter)
                 }
             } else {
-                // Stacked layout (phones), single scroll
+                // Phone layout: stacked sections
                 ChartSectionDashboard(items = filtered, filter = typeFilter, vizType = vizType, onVizTypeChange = { vizType = it })
-                InsightsSection(insightItems, typeFilter)
+                // Insights
+                InsightsSection(allItems = insightItems, currentFilter = typeFilter)
+                // Recent investments
                 if (recent.isNotEmpty()) {
                     Text(stringResource(id = com.ss.wealthtracker.R.string.recent_investments), style = MaterialTheme.typography.titleLarge)
                     HorizontalDivider()
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        recent.forEach { e ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                val icon = when (e.investmentType) {
-                                    "FD" -> Icons.Default.AccountBalance
-                                    "Mutual Fund" -> Icons.AutoMirrored.Filled.TrendingUp
-                                    "PPF", "EPF", "NPS" -> Icons.Default.AccountBalance
-                                    "Gold" -> Icons.Default.Savings
-                                    "Health Insurance", "Term Insurance" -> Icons.Default.Savings
-                                    "Equity", "Stocks" -> Icons.AutoMirrored.Filled.TrendingUp
-                                    else -> Icons.Default.Savings
-                                }
-                                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(10.dp))
-                                Column(Modifier.weight(1f)) {
-                                    val title = when (e.investmentType) {
-                                        "FD" -> stringResource(id = com.ss.wealthtracker.R.string.fixed_deposit)
-                                        "Equity", "Stocks" -> (e.stockName?.takeIf { it.isNotBlank() } ?: "Stocks")
-                                        "Mutual Fund" -> e.type.ifBlank { "Mutual Fund" }
-                                        "Gold" -> e.goldType?.takeIf { it.isNotBlank() } ?: "Gold"
-                                        "Health Insurance" -> e.hiPolicyName?.takeIf { it.isNotBlank() } ?: "Health Insurance"
-                                        else -> if (e.investmentType == "Others") e.type.ifBlank { "Others" } else e.investmentType
-                                    }
-                                    Text(title, fontWeight = FontWeight.SemiBold)
-                                    val subtitleBits = mutableListOf<String>()
-                                    when (e.investmentType) {
-                                        "FD" -> { e.bankName?.takeIf { it.isNotBlank() }?.let { subtitleBits += it }; e.fdRate?.let { subtitleBits += "${String.format(java.util.Locale.ENGLISH, "%.2f", it)}%" }; e.fdMaturityDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += "Maturity $it" } }
-                                        "Equity", "Stocks" -> { e.stockDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
-                                        "Mutual Fund" -> { e.mfDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
-                                        "Gold" -> { e.goldDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
-                                        "PPF" -> { e.ppfFy?.takeIf { it.isNotBlank() }?.let { subtitleBits += it }; e.ppfDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
-                                        "NPS" -> { e.npsTier?.takeIf { it.isNotBlank() }?.let { subtitleBits += it }; e.npsDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
-                                        "Health Insurance" -> { e.hiRenewalDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += "Renews $it" } }
-                                        else -> {}
-                                    }
-                                    if (subtitleBits.isNotEmpty()) {
-                                        Text(subtitleBits.joinToString(" • "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                Text(FormatUtils.formatINRShort(e.amount), fontWeight = FontWeight.Bold)
+                    recent.forEach { e ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            val icon = when (e.investmentType) {
+                                "FD" -> Icons.Default.AccountBalance
+                                "Mutual Fund" -> Icons.AutoMirrored.Filled.TrendingUp
+                                "PPF", "EPF", "NPS" -> Icons.Default.AccountBalance
+                                "Gold" -> Icons.Default.Savings
+                                "Health Insurance", "Term Insurance" -> Icons.Default.Savings
+                                "Equity", "Stocks" -> Icons.AutoMirrored.Filled.TrendingUp
+                                else -> Icons.Default.Savings
                             }
+                            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                val title = when (e.investmentType) {
+                                    "FD" -> stringResource(id = com.ss.wealthtracker.R.string.fixed_deposit)
+                                    "Equity", "Stocks" -> (e.stockName?.takeIf { it.isNotBlank() } ?: "Stocks")
+                                    "Mutual Fund" -> e.type.ifBlank { "Mutual Fund" }
+                                    "Gold" -> e.goldType?.takeIf { it.isNotBlank() } ?: "Gold"
+                                    "Health Insurance" -> e.hiPolicyName?.takeIf { it.isNotBlank() } ?: "Health Insurance"
+                                    else -> if (e.investmentType == "Others") e.type.ifBlank { "Others" } else e.investmentType
+                                }
+                                Text(title, fontWeight = FontWeight.SemiBold)
+                                val subtitleBits = mutableListOf<String>()
+                                when (e.investmentType) {
+                                    "FD" -> { e.bankName?.takeIf { it.isNotBlank() }?.let { subtitleBits += it }; e.fdRate?.let { subtitleBits += "${String.format(java.util.Locale.ENGLISH, "%.2f", it)}%" }; e.fdMaturityDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += "Maturity $it" } }
+                                    "Equity", "Stocks" -> { e.stockDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
+                                    "Mutual Fund" -> { e.mfDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
+                                    "Gold" -> { e.goldDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
+                                    "PPF" -> { e.ppfFy?.takeIf { it.isNotBlank() }?.let { subtitleBits += it }; e.ppfDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
+                                    "NPS" -> { e.npsTier?.takeIf { it.isNotBlank() }?.let { subtitleBits += it }; e.npsDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += it } }
+                                    "Health Insurance" -> { e.hiRenewalDate?.takeIf { it.isNotBlank() }?.let { subtitleBits += "Renews $it" } }
+                                    else -> {}
+                                }
+                                if (subtitleBits.isNotEmpty()) {
+                                    Text(subtitleBits.joinToString(" • "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Text(FormatUtils.formatINRShort(e.amount), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
+    }
+    }
+    
+    // Reminder overlay - covers entire screen including topBar/bottomBar
+    if (canShow) {
+        LaunchedEffect(Unit) {
+            startupShown += 1
+            prefs.edit().putInt("startup_shown", startupShown).apply()
+        }
+        val pager = rememberPagerState(pageCount = { reminders.size })
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.75f))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) { }
+        ) {
+            Card(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .fillMaxWidth(0.9f)
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Header with close button
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Reminder",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(
+                            onClick = { showReminderCarousel = false },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // Pager content
+                    HorizontalPager(state = pager) { idx ->
+                        val r = reminders[idx]
+                        Column(
+                            Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Title with investment type badge
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = r.color.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        r.investmentType,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = r.color,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                r.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            
+                            // Due date card with action label
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = r.color.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    Modifier.padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            "${r.action} Date",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            r.whenText,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = r.color
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.Default.Savings,
+                                        contentDescription = null,
+                                        tint = r.color,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Page indicators
+                    if (reminders.size > 1) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            repeat(reminders.size) { i ->
+                                val active = pager.currentPage == i
+                                Box(
+                                    Modifier
+                                        .padding(horizontal = 3.dp)
+                                        .size(if (active) 8.dp else 6.dp)
+                                        .background(
+                                            if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                            CircleShape
+                                        )
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Action buttons
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                showReminderCarousel = false
+                                Toast.makeText(ctx, "We'll remind you next time you open the app", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Later")
+                        }
+                        Button(
+                            onClick = {
+                                val current = reminders[pager.currentPage]
+                                ackSet += current.id
+                                prefs.edit().putStringSet("ack_ids", ackSet).apply()
+                                if (pager.currentPage == reminders.lastIndex) {
+                                    showReminderCarousel = false
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Got it")
+                        }
+                    }
+                }
+            }
+        }
+    }
     }
 }
 
@@ -325,7 +591,7 @@ fun DashboardScreen(
 private fun InsightsSection(allItems: List<InvestmentEntity>, currentFilter: String?) {
     if (allItems.isEmpty()) return
     Spacer(Modifier.height(8.dp))
-    val title = if (currentFilter.isNullOrBlank()) "Insights" else "Insights · ${if (currentFilter == "Equity") "Stocks" else currentFilter}"
+    val title = if (currentFilter.isNullOrBlank()) "Insights" else "Insights · " + (if (currentFilter == "Equity") "Stocks" else currentFilter)
     Text(title, style = MaterialTheme.typography.titleLarge)
     Spacer(Modifier.height(8.dp))
     val items = allItems.map { e -> if (e.investmentType == "Equity") e.copy(investmentType = "Stocks") else e }
@@ -358,43 +624,46 @@ private fun InsightsSection(allItems: List<InvestmentEntity>, currentFilter: Str
             }
 
             val fds = items.filter { it.investmentType == "FD" }
-            val avgRate = fds.mapNotNull { it.fdRate }.takeIf { it.isNotEmpty() }?.average()
-            if (avgRate != null) SmallInsightCard(title = "FD Avg Rate", value = "${"%.2f".format(avgRate)}%", iconAsset = "icons/bank.svg")
-
-            val topBank = fds.groupBy { it.bankName ?: "Unknown" }
-                .mapValues { it.value.sumOf { v -> v.amount } }
-                .maxByOrNull { it.value }?.key
-            if (!topBank.isNullOrBlank()) SmallInsightCard(title = "Top FD Bank", value = topBank, iconAsset = "icons/bank.svg")
+            if (fds.isNotEmpty()) {
+                val avgRate = fds.mapNotNull { it.fdRate }.average().takeIf { !it.isNaN() }
+                if (avgRate != null) SmallInsightCard(title = "FD Avg Rate", value = "${"%.2f".format(avgRate)}%", iconAsset = "icons/bank.svg")
+                val banks = fds.mapNotNull { it.bankName }.distinct().size
+                if (banks > 0) SmallInsightCard(title = "FD Banks", value = FormatUtils.formatInt(banks), iconAsset = "icons/bank.svg")
+            }
 
             val stocks = items.filter { it.investmentType == "Stocks" }
-            val count = stocks.size
-            val invested = stocks.sumOf { it.amount }
-            SmallInsightCard(title = "Stocks (${FormatUtils.formatInt(count)})", value = FormatUtils.formatINR(invested), iconAsset = "icons/stock.svg")
+            if (stocks.isNotEmpty()) {
+                val invested = stocks.sumOf { it.amount }
+                SmallInsightCard(title = "Stocks (${FormatUtils.formatInt(stocks.size)})", value = FormatUtils.formatINR(invested), iconAsset = "icons/stock.svg")
+                val avgInv = invested / stocks.size
+                SmallInsightCard(title = "Avg/Stock", value = FormatUtils.formatINRShort(avgInv), iconAsset = "icons/stock.svg")
+            }
 
-            val soonest = items.filter { it.investmentType == "Health Insurance" }
-                .mapNotNull { e -> e.hiRenewalDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } } }
-                .minByOrNull { it.first }
-            soonest?.let { (date, e) ->
-                val t = e.hiPolicyName?.takeIf { it.isNotBlank() } ?: "Renewal"
-                SmallInsightCard(title = t, value = formatAddedOnDashboard(date), iconAsset = "icons/shield.svg")
+            val hi = items.filter { it.investmentType == "Health Insurance" }
+            if (hi.isNotEmpty()) {
+                val total = hi.sumOf { it.amount }
+                SmallInsightCard(title = "HI Premium", value = FormatUtils.formatINRShort(total), iconAsset = "icons/shield.svg")
+                val soonest = hi.mapNotNull { e -> e.hiRenewalDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } } }.minByOrNull { it.first }
+                soonest?.let { (date, _) -> SmallInsightCard(title = "Next Renewal", value = formatAddedOnDashboard(date), iconAsset = "icons/shield.svg") }
             }
         } else when (filteredType) {
             "FD" -> {
                 val fds = items
                 val total = fds.sumOf { it.amount }
                 SmallInsightCard(title = "Total in FD", value = FormatUtils.formatINR(total), iconAsset = "icons/bank.svg")
-                val avgRate = fds.mapNotNull { it.fdRate }.takeIf { it.isNotEmpty() }?.average()
+                SmallInsightCard(title = "FD Count", value = FormatUtils.formatInt(fds.size), iconAsset = "icons/bank.svg")
+                val avgRate = fds.mapNotNull { it.fdRate }.average().takeIf { !it.isNaN() }
                 if (avgRate != null) SmallInsightCard(title = "Avg Rate", value = "${"%.2f".format(avgRate)}%", iconAsset = "icons/bank.svg")
-                val topBank = fds.groupBy { it.bankName ?: "Unknown" }
-                    .mapValues { it.value.sumOf { v -> v.amount } }
-                    .maxByOrNull { it.value }?.key
-                if (!topBank.isNullOrBlank()) SmallInsightCard(title = "Top Bank", value = topBank, iconAsset = "icons/bank.svg")
+                val maxRate = fds.mapNotNull { it.fdRate }.maxOrNull()
+                if (maxRate != null) SmallInsightCard(title = "Highest Rate", value = "${"%.2f".format(maxRate)}%", iconAsset = "icons/bank.svg")
             }
             "Stocks" -> {
                 val stocks = items
                 SmallInsightCard(title = "Count", value = FormatUtils.formatInt(stocks.size), iconAsset = "icons/stock.svg")
                 val total = stocks.sumOf { it.amount }
                 SmallInsightCard(title = "Invested", value = FormatUtils.formatINR(total), iconAsset = "icons/stock.svg")
+                val avgInv = total / stocks.size.coerceAtLeast(1)
+                SmallInsightCard(title = "Avg/Stock", value = FormatUtils.formatINRShort(avgInv), iconAsset = "icons/stock.svg")
                 val top = stocks.groupBy { ((it.stockName ?: it.type).ifBlank { "Unknown" }) }
                     .mapValues { it.value.sumOf { v -> v.amount } }
                     .toList().sortedByDescending { it.second }.firstOrNull()?.first
@@ -402,9 +671,39 @@ private fun InsightsSection(allItems: List<InvestmentEntity>, currentFilter: Str
             }
             "Health Insurance" -> {
                 val hi = items
-                val next = hi.mapNotNull { e -> e.hiRenewalDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } } }.minByOrNull { it.first }
+                val total = hi.sumOf { it.amount }
                 SmallInsightCard(title = "Policies", value = FormatUtils.formatInt(hi.size), iconAsset = "icons/shield.svg")
+                SmallInsightCard(title = "Total Premium", value = FormatUtils.formatINR(total), iconAsset = "icons/shield.svg")
+                val avg = total / hi.size.coerceAtLeast(1)
+                SmallInsightCard(title = "Avg Premium", value = FormatUtils.formatINRShort(avg), iconAsset = "icons/shield.svg")
+                val next = hi.mapNotNull { e -> e.hiRenewalDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } } }.minByOrNull { it.first }
                 next?.let { (d, _) -> SmallInsightCard(title = "Next Renewal", value = formatAddedOnDashboard(d), iconAsset = "icons/shield.svg") }
+            }
+            "Mutual Fund" -> {
+                val total = items.sumOf { it.amount }
+                SmallInsightCard(title = "Total", value = FormatUtils.formatINR(total))
+                SmallInsightCard(title = "Funds", value = FormatUtils.formatInt(items.size))
+                val avg = total / items.size.coerceAtLeast(1)
+                SmallInsightCard(title = "Avg/Fund", value = FormatUtils.formatINRShort(avg))
+            }
+            "Gold" -> {
+                val total = items.sumOf { it.amount }
+                SmallInsightCard(title = "Total Gold", value = FormatUtils.formatINR(total), iconAsset = "icons/gold.svg")
+                SmallInsightCard(title = "Holdings", value = FormatUtils.formatInt(items.size), iconAsset = "icons/gold.svg")
+                val avg = total / items.size.coerceAtLeast(1)
+                SmallInsightCard(title = "Avg/Holding", value = FormatUtils.formatINRShort(avg), iconAsset = "icons/gold.svg")
+            }
+            "PPF", "EPF", "NPS" -> {
+                val total = items.sumOf { it.amount }
+                SmallInsightCard(title = "Total", value = FormatUtils.formatINR(total))
+                SmallInsightCard(title = "Accounts", value = FormatUtils.formatInt(items.size))
+                val avg = total / items.size.coerceAtLeast(1)
+                SmallInsightCard(title = "Avg/Account", value = FormatUtils.formatINRShort(avg))
+            }
+            "Term Insurance" -> {
+                val total = items.sumOf { it.amount }
+                SmallInsightCard(title = "Policies", value = FormatUtils.formatInt(items.size), iconAsset = "icons/shield.svg")
+                SmallInsightCard(title = "Total Premium", value = FormatUtils.formatINR(total), iconAsset = "icons/shield.svg")
             }
             else -> {
                 val total = items.sumOf { it.amount }
@@ -444,17 +743,17 @@ private fun InsightsSection(allItems: List<InvestmentEntity>, currentFilter: Str
             }.size
             SmallInsightCard("Diversification", "${FormatUtils.formatInt(distinct)} assets")
             val fdSoon = items.filter { it.investmentType == "FD" }.mapNotNull { it.fdMaturityDate?.let { d -> parseUiDateDashboard(d) } }.count {
-                val days = java.time.Period.between(java.time.LocalDate.now(), it).days
+                val days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), it).toInt()
                 days in 0..90
             }
             val hiSoon = items.filter { it.investmentType == "Health Insurance" }.mapNotNull { it.hiRenewalDate?.let { d -> parseUiDateDashboard(d) } }.count {
-                val days = java.time.Period.between(java.time.LocalDate.now(), it).days
+                val days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), it).toInt()
                 days in 0..60
             }
-            if (fdSoon > 0) SmallInsightCard("FDs <90d", FormatUtils.formatInt(fdSoon))
-            if (hiSoon > 0) SmallInsightCard("Renewals <60d", FormatUtils.formatInt(hiSoon))
-            analysisLines += "Portfolio concentration: $conc. Top type covers ${String.format(java.util.Locale.ENGLISH, "%.1f%%", topShare)} of invested amount."
-            if (fdSoon > 0 || hiSoon > 0) analysisLines += "Upcoming: $fdSoon FD maturities within 90d, $hiSoon insurance renewals within 60d."
+            if (fdSoon > 0) SmallInsightCard("FDs <${FormatUtils.formatInt(90)}d", FormatUtils.formatInt(fdSoon))
+            if (hiSoon > 0) SmallInsightCard("Renewals <${FormatUtils.formatInt(60)}d", FormatUtils.formatInt(hiSoon))
+            analysisLines += "Portfolio concentration: $conc. Top type covers ${FormatUtils.formatPercent(topShare)} of invested amount."
+            if (fdSoon > 0 || hiSoon > 0) analysisLines += "Upcoming: ${FormatUtils.formatInt(fdSoon)} FD maturities within ${FormatUtils.formatInt(90)}d, ${FormatUtils.formatInt(hiSoon)} insurance renewals within ${FormatUtils.formatInt(60)}d."
         } else when (filteredType) {
             "Stocks" -> {
                 val stocks = items
@@ -462,10 +761,10 @@ private fun InsightsSection(allItems: List<InvestmentEntity>, currentFilter: Str
                 val uniq = byName.size
                 val topShare = if (byName.isNotEmpty()) byName.first().second / totalAmt * 100.0 else 0.0
                 SmallInsightCard("Unique Stocks", FormatUtils.formatInt(uniq), iconAsset = "icons/stock.svg")
-                SmallInsightCard("Top Holding %", String.format(java.util.Locale.ENGLISH, "%.1f%%", topShare.coerceAtMost(100.0)), iconAsset = "icons/stock.svg")
+                SmallInsightCard("Top Holding %", FormatUtils.formatPercent(topShare.coerceAtMost(100.0)), iconAsset = "icons/stock.svg")
                 val top3Share = byName.take(3).sumOf { it.second } / totalAmt * 100.0
-                SmallInsightCard("Top 3 Cover", String.format(java.util.Locale.ENGLISH, "%.1f%%", top3Share.coerceAtMost(100.0)), iconAsset = "icons/stock.svg")
-                analysisLines += "Stocks: ${FormatUtils.formatInt(uniq)} holdings. Top holding ${String.format(java.util.Locale.ENGLISH, "%.1f%%", topShare)}; top 3 cover ${String.format(java.util.Locale.ENGLISH, "%.1f%%", top3Share)}."
+                SmallInsightCard("Top 3 Cover", FormatUtils.formatPercent(top3Share.coerceAtMost(100.0)), iconAsset = "icons/stock.svg")
+                analysisLines += "Stocks: ${FormatUtils.formatInt(uniq)} holdings. Top holding ${FormatUtils.formatPercent(topShare)}; top 3 cover ${FormatUtils.formatPercent(top3Share)}."
             }
             "FD" -> {
                 val fds = items
@@ -475,35 +774,88 @@ private fun InsightsSection(allItems: List<InvestmentEntity>, currentFilter: Str
                     val days = java.time.Period.between(java.time.LocalDate.now(), it).days
                     days in 0..90
                 }
-                avgRate?.let { SmallInsightCard("Avg Rate", String.format(java.util.Locale.ENGLISH, "%.2f%%", it), iconAsset = "icons/bank.svg") }
+                avgRate?.let { SmallInsightCard("Avg Rate", FormatUtils.formatPercent(it), iconAsset = "icons/bank.svg") }
                 nearest?.let { SmallInsightCard("Nearest Maturity", formatAddedOnDashboard(it), iconAsset = "icons/bank.svg") }
-                if (soon > 0) SmallInsightCard("Maturing <90d", FormatUtils.formatInt(soon), iconAsset = "icons/bank.svg")
-                analysisLines += "FDs: ${FormatUtils.formatInt(fds.size)} deposits; ${soon} maturing within 90d." + (if (avgRate != null) " Avg rate ${String.format(java.util.Locale.ENGLISH, "%.2f%%", avgRate)}." else "")
+                if (soon > 0) SmallInsightCard("Maturing <${FormatUtils.formatInt(90)}d", FormatUtils.formatInt(soon), iconAsset = "icons/bank.svg")
+                analysisLines += "FDs: ${FormatUtils.formatInt(fds.size)} deposits; ${FormatUtils.formatInt(soon)} maturing within ${FormatUtils.formatInt(90)}d." + (if (avgRate != null) " Avg rate ${FormatUtils.formatPercent(avgRate)}." else "")
             }
             "Mutual Fund" -> {
-                val byFund = items.groupBy { it.type.ifBlank { "Mutual Fund" } }.mapValues { it.value.sumOf { v -> v.amount } }.toList().sortedByDescending { it.second }
+                val byFund = items.groupBy { it.type.ifBlank { "Unknown" } }.mapValues { it.value.sumOf { v -> v.amount } }.toList().sortedByDescending { it.second }
                 val uniq = byFund.size
                 val topShare = if (byFund.isNotEmpty()) byFund.first().second / totalAmt * 100.0 else 0.0
                 SmallInsightCard("Unique Funds", FormatUtils.formatInt(uniq))
-                SmallInsightCard("Top Fund %", String.format(java.util.Locale.ENGLISH, "%.1f%%", topShare.coerceAtMost(100.0)))
-                analysisLines += "MF: ${FormatUtils.formatInt(uniq)} schemes. Top fund concentration ${String.format(java.util.Locale.ENGLISH, "%.1f%%", topShare)}."
+                SmallInsightCard("Top Fund %", FormatUtils.formatPercent(topShare.coerceAtMost(100.0)))
+                val amounts = items.map { it.amount }
+                if (amounts.isNotEmpty()) {
+                    val min = amounts.minOrNull() ?: 0.0
+                    val max = amounts.maxOrNull() ?: 0.0
+                    if (min != max) SmallInsightCard("Investment Range", "${FormatUtils.formatINRShort(min)}-${FormatUtils.formatINRShort(max)}")
+                }
+                val top3Share = byFund.take(3).sumOf { it.second } / totalAmt * 100.0
+                SmallInsightCard("Top 3 Cover", FormatUtils.formatPercent(top3Share.coerceAtMost(100.0)))
+                analysisLines += "MF: ${FormatUtils.formatInt(uniq)} schemes. Top fund concentration ${FormatUtils.formatPercent(topShare)}; top 3 cover ${FormatUtils.formatPercent(top3Share)}."
             }
             "Gold" -> {
                 val byType = items.groupBy { (it.goldType ?: "Gold").ifBlank { "Gold" } }.mapValues { it.value.sumOf { v -> v.amount } }.toList().sortedByDescending { it.second }
                 val uniq = byType.size
                 val topShare = if (byType.isNotEmpty()) byType.first().second / totalAmt * 100.0 else 0.0
                 SmallInsightCard("Gold Types", FormatUtils.formatInt(uniq), iconAsset = "icons/gold.svg")
-                SmallInsightCard("Top Type %", String.format(java.util.Locale.ENGLISH, "%.1f%%", topShare.coerceAtMost(100.0)), iconAsset = "icons/gold.svg")
-                analysisLines += "Gold: ${FormatUtils.formatInt(uniq)} types. Top type ${String.format(java.util.Locale.ENGLISH, "%.1f%%", topShare)}."
+                SmallInsightCard("Top Type %", FormatUtils.formatPercent(topShare.coerceAtMost(100.0)), iconAsset = "icons/gold.svg")
+                val amounts = items.map { it.amount }
+                if (amounts.isNotEmpty()) {
+                    val min = amounts.minOrNull() ?: 0.0
+                    val max = amounts.maxOrNull() ?: 0.0
+                    if (min != max) SmallInsightCard("Investment Range", "${FormatUtils.formatINRShort(min)}-${FormatUtils.formatINRShort(max)}", iconAsset = "icons/gold.svg")
+                }
+                val oldest = items.minByOrNull { it.createdAt }
+                oldest?.let { SmallInsightCard("First Purchase", formatAddedOnDashboard(java.time.Instant.ofEpochMilli(it.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()), iconAsset = "icons/gold.svg") }
+                analysisLines += "Gold: ${FormatUtils.formatInt(uniq)} types. Top type ${FormatUtils.formatPercent(topShare)}."
+            }
+            "PPF", "EPF", "NPS" -> {
+                val amounts = items.map { it.amount }
+                if (amounts.isNotEmpty()) {
+                    val min = amounts.minOrNull() ?: 0.0
+                    val max = amounts.maxOrNull() ?: 0.0
+                    if (min != max) SmallInsightCard("Contribution Range", "${FormatUtils.formatINRShort(min)}-${FormatUtils.formatINRShort(max)}")
+                }
+                val oldest = items.minByOrNull { it.createdAt }
+                oldest?.let { SmallInsightCard("Oldest Account", formatAddedOnDashboard(java.time.Instant.ofEpochMilli(it.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate())) }
+                val recent = items.filter { 
+                    val days = java.time.temporal.ChronoUnit.DAYS.between(
+                        java.time.Instant.ofEpochMilli(it.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+                        java.time.LocalDate.now()
+                    )
+                    days <= 365
+                }.size
+                if (recent > 0) SmallInsightCard("Added This Year", FormatUtils.formatInt(recent))
+                analysisLines += "${filteredType}: ${FormatUtils.formatInt(items.size)} accounts."
+            }
+            "Term Insurance" -> {
+                val amounts = items.map { it.amount }
+                if (amounts.isNotEmpty()) {
+                    val min = amounts.minOrNull() ?: 0.0
+                    val max = amounts.maxOrNull() ?: 0.0
+                    if (min != max) SmallInsightCard("Premium Range", "${FormatUtils.formatINRShort(min)}-${FormatUtils.formatINRShort(max)}", iconAsset = "icons/shield.svg")
+                }
+                val oldest = items.minByOrNull { it.createdAt }
+                oldest?.let { SmallInsightCard("Oldest Policy", formatAddedOnDashboard(java.time.Instant.ofEpochMilli(it.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()), iconAsset = "icons/shield.svg") }
+                analysisLines += "Term Insurance: ${FormatUtils.formatInt(items.size)} policies."
             }
             "Health Insurance" -> {
                 val soon = items.mapNotNull { it.hiRenewalDate?.let { d -> parseUiDateDashboard(d) } }.count {
                     val days = java.time.Period.between(java.time.LocalDate.now(), it).days
                     days in 0..60
                 }
-                SmallInsightCard("Policies", FormatUtils.formatInt(items.size), iconAsset = "icons/shield.svg")
-                if (soon > 0) SmallInsightCard("Renewals <60d", FormatUtils.formatInt(soon), iconAsset = "icons/shield.svg")
-                analysisLines += "Insurance: ${FormatUtils.formatInt(items.size)} policies; ${FormatUtils.formatInt(soon)} renewals within 60d."
+                if (soon > 0) SmallInsightCard("Renewals <${FormatUtils.formatInt(60)}d", FormatUtils.formatInt(soon), iconAsset = "icons/shield.svg")
+                val amounts = items.map { it.amount }
+                if (amounts.isNotEmpty()) {
+                    val min = amounts.minOrNull() ?: 0.0
+                    val max = amounts.maxOrNull() ?: 0.0
+                    if (min != max) SmallInsightCard("Premium Range", "${FormatUtils.formatINRShort(min)}-${FormatUtils.formatINRShort(max)}", iconAsset = "icons/shield.svg")
+                }
+                val oldest = items.minByOrNull { it.createdAt }
+                oldest?.let { SmallInsightCard("Oldest Policy", formatAddedOnDashboard(java.time.Instant.ofEpochMilli(it.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()), iconAsset = "icons/shield.svg") }
+                analysisLines += "Insurance: ${FormatUtils.formatInt(items.size)} policies; ${FormatUtils.formatInt(soon)} renewals within ${FormatUtils.formatInt(60)}d."
             }
             else -> {}
         }
@@ -521,14 +873,17 @@ private fun InsightsSection(allItems: List<InvestmentEntity>, currentFilter: Str
 }
 
 @Composable
-private fun SmallInsightCard(title: String, value: String, iconAsset: String? = null) {
+private fun SmallInsightCard(title: String, value: String, leadingIcon: ImageVector? = null, iconAsset: String? = null) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.widthIn(min = 140.dp).padding(vertical = 2.dp)
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (iconAsset != null) IconAsset(iconAsset)
+                when {
+                    leadingIcon != null -> Icon(leadingIcon, contentDescription = null)
+                    iconAsset != null -> IconAsset(iconAsset)
+                }
                 Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
             }
             Text(value.ifBlank { "—" }, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
@@ -600,15 +955,33 @@ private fun FdRatesSection() {
 }
 
 @Composable
-private fun SummaryCard(modifier: Modifier = Modifier, title: String, value: String, color: Color) {
+private fun SummaryCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    color: Color
+) {
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(12.dp)) {
             Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-            Spacer(Modifier.height(6.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = color)
+            Spacer(Modifier.height(2.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.offset(y = (-1).dp)) {
+                    Text(
+                        value,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = color
+                    )
+                }
+            }
         }
     }
 }
+
 
 @Composable
 private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?, vizType: String, onVizTypeChange: (String) -> Unit) {
@@ -720,7 +1093,7 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                                     val denom = (ds?.values?.sumOf { it.value.toDouble() } ?: 0.0).coerceAtLeast(1.0)
                                     val pctRaw = (pe.value.toDouble() / denom * 100.0)
                                     val pct = if (pctRaw > 0.0 && pctRaw < 0.1) 0.1 else kotlin.math.round(pctRaw * 10.0) / 10.0
-                                    label = "${pe.label}: ${"%.1f".format(pct)}%"
+                                    label = "${pe.label}: ${FormatUtils.formatPercent(pct)}"
                                 }
                                 override fun draw(canvas: android.graphics.Canvas?, posX: Float, posY: Float) {
                                     if (canvas == null || label.isBlank()) return
@@ -764,7 +1137,7 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                                 drawRect(color = Color(colors[idx % colors.size]))
                             }
                             Spacer(Modifier.width(6.dp))
-                            Text("${truncateLabel(label)}: ${"%.1f".format(pct)}%", style = MaterialTheme.typography.labelMedium)
+                            Text("${truncateLabel(label)}: ${FormatUtils.formatPercent(pct)}", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -783,7 +1156,7 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                             override fun getBarLabel(barEntry: com.github.mikephil.charting.data.BarEntry?): String {
                                 val raw = (barEntry?.y ?: 0f).toDouble()
                                 val pct = if (raw > 0.0 && raw < 0.1) 0.1 else kotlin.math.round(raw * 10.0) / 10.0
-                                return "${"%.1f".format(pct)}%"
+                                return FormatUtils.formatPercent(pct)
                             }
                         })
                         if (barAnimateOnToggle) barAnimateOnToggle = false
@@ -802,7 +1175,7 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                                 drawRect(color = Color(colors[idx % colors.size]))
                             }
                             Spacer(Modifier.width(6.dp))
-                            Text("${truncateLabel(label)}: ${"%.1f".format(pct)}%", style = MaterialTheme.typography.labelMedium)
+                            Text("${truncateLabel(label)}: ${FormatUtils.formatPercent(pct)}", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }

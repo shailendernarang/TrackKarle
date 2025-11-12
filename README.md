@@ -28,12 +28,68 @@ Private, offline-first Android app to record manual investments and view a simpl
 - **InvestmentScreen charts removed** (kept on Dashboard only) for simpler UX.
 - **Firebase Crashlytics** integrated (mapping upload enabled for release).
 
+### What's New (27.9.4)
+- **Critical Fix**: First-launch crash resolved with comprehensive ProGuard/R8 rules
+  - Room entities preserved to prevent database initialization failures
+  - Compose functions protected from aggressive obfuscation
+  - Repository and data layer classes properly kept
+- **UI/UX Improvements**:
+  - Investment Type label: Increased spacing and text size for better readability
+  - Touch targets fixed: Date pickers and dropdowns now work on entire field, not just icon
+  - Three-dot menu: Edit/Delete actions consolidated into dropdown menu (saves screen space)
+  - FD Rates section: Responsive sizing for phone screens, reduced header and sort field sizes
+  - Numeric keyboards: All amount/rate/tenure fields now show numeric input
+  - Input field sizing: Reduced "add investment" area field heights for compact display
+- **Enhanced Insights**:
+  - Added 25+ new investment metrics across all types
+  - FD: Count, Banks, Highest Rate
+  - Stocks: Average per stock, Top 3 coverage
+  - Health Insurance: Total Premium, Avg Premium, Premium Range, Oldest Policy
+  - Mutual Fund: Investment Range, Top 3 Cover
+  - Gold: Investment Range, First Purchase
+  - PPF/EPF/NPS: Contribution Range, Oldest Account, Added This Year
+  - Term Insurance: Premium Range, Oldest Policy
+- **Font consistency**: Montserrat font applied throughout app with responsive sizing
+- **Test coverage**: 16/18 unit tests passing (FormatUtils 100% coverage)
+
+### Previous Release (27.9.2)
+- **Play variant as primary**: Standardized shipping on Play (plain) build.
+- **Data migration safety**: Forward/reverse migration with deduplication.
+- **UI polish for phones**: FAB navigation, centered CTAs, numeric keyboards.
+- **Branding consistency**: App name and exports use "TrackKaro".
+
+### Publishing
+- **Gradle Play Publisher** configured. Publish with:
+  - `./gradlew :app:publishPlayRelease` (uses Internal track by default).
+  - Provide service account JSON via `PLAY_SERVICE_ACCOUNT_JSON` env or `play-service-account.json` at project root.
+
+### ProGuard Configuration
+- **Current**: Conservative rules (keeps most libraries intact)
+  - Location: `app/proguard-rules.pro`
+  - Safe for production, prevents first-launch crash
+  - Minimal APK size reduction (~5-10%)
+- **Optimized**: Available for future use
+  - Location: `app/proguard-rules-optimized.pro`
+  - Targets specific classes only
+  - Potential 30-40% APK size reduction
+  - Requires thorough testing before deployment
+
 ## Can be done (backlog)
 - AMFI NAV annotations for mutual funds (read-only).
 - Encrypted local backup/restore flows.
 - Richer dashboards and breakdowns (by bank/time/range).
 - Tax helpers (80C/80D, LTCG/STCG hints) and SIP reminders.
 - Accessibility polish (high-contrast mode), more localization.
+
+## Pending / Next
+- **Backup & Restore**: Export/Import JSON in Settings (offline, user-initiated).
+- **Theme polish**: Update status bar handling (avoid deprecated setter) and refine phone typography scale.
+- **Analytics (optional)**: If desired later, add Firebase Analytics events for DB backend/migration.
+- **Code cleanup**: Optionally remove Play-side encrypted pull stub (it safely no-ops now); extract migration helpers.
+- **Test improvements**: 
+  - Fix ViewModel test async timing issues (use UnconfinedTestDispatcher)
+  - Add instrumented tests for UI components
+  - Consider Robolectric for Android-dependent unit tests
 
 ## Tech Stack
 - UI: Jetpack Compose + Material 3
@@ -43,6 +99,7 @@ Private, offline-first Android app to record manual investments and view a simpl
 - Charts: MPAndroidChart via AndroidView (with shared **ChartUtils**)
 - Language: Kotlin (Coroutines/Flow)
 - Messaging/Crash: Firebase Cloud Messaging, **Crashlytics**
+- Testing: JUnit 4, Mockito, Kotlinx Coroutines Test, Room Testing
 
 ## Project Structure
 - `app/src/main/java/com/example/wealthtracker/ui/` Compose screens and ViewModel
@@ -63,6 +120,39 @@ Private, offline-first Android app to record manual investments and view a simpl
 ./gradlew installDebug    # install on device/emulator
 ```
 APK path: `app/build/outputs/apk/debug/app-debug.apk`
+
+## Testing
+```bash
+# Run all unit tests
+./gradlew test
+
+# Run specific test suite
+./gradlew test --tests FormatUtilsTest
+
+# Generate test report
+./gradlew test
+# Report: app/build/reports/tests/testPlayDebugUnitTest/index.html
+```
+
+### Test Coverage
+- **FormatUtilsTest**: 15/15 tests passing (100%)
+  - Currency formatting (INR, INR Short)
+  - Integer formatting with Indian numbering
+  - Percentage formatting
+  - Hindi numerals toggle
+- **InvestmentViewModelTest**: 1/3 tests passing
+  - Filtering and sorting (has async timing issues)
+  - Validation gates (has async timing issues)
+- **Overall**: 16/18 tests passing (88.9%)
+
+### Test Dependencies
+- JUnit 4.13.2
+- Kotlin Test 1.9.20
+- Kotlinx Coroutines Test 1.7.3
+- Mockito Core 5.7.0
+- Mockito Kotlin 5.1.0
+- AndroidX Core Testing 2.2.0
+- Room Testing 2.7.0
 
 ## Usage
 - Add Investment: Enter amount → choose type → (FD) select bank or (Others) enter custom name → Add.

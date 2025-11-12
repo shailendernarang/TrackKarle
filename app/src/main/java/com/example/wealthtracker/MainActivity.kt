@@ -40,6 +40,10 @@ import com.example.wealthtracker.ui.screens.DashboardScreen
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
  
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.wealthtracker.ui.InvestmentViewModel
@@ -141,8 +145,8 @@ class MainActivity : AppCompatActivity() {
                             // Skip splash delay when launched from a notification
                             showComposeSplash = false
                         } else {
-                            // Faster splash to reduce perceived sluggishness
-                            delay(1000)
+                            // Show splash for 3 seconds as requested
+                            delay(3000)
                             showComposeSplash = false
                         }
                     }
@@ -209,7 +213,13 @@ class MainActivity : AppCompatActivity() {
                         val startRoute = rememberStartRoute(fromNotification, vm)
                         if (startRoute != null) {
                             NavHost(navController = nav, startDestination = startRoute) {
-                                composable("dashboard") {
+                                composable(
+                                    "dashboard",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
                                     WithLocalizedContext(useHindiNumerals) {
                                         DashboardScreen(
                                             viewModel = vm,
@@ -220,14 +230,26 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                 }
-                                composable("stocks") {
+                                composable(
+                                    "stocks",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
                                     WithLocalizedContext(useHindiNumerals) {
                                         com.example.wealthtracker.ui.screens.StockAnalysisScreen(
                                             onBack = { nav.popBackStack() }
                                         )
                                     }
                                 }
-                                composable("invest") {
+                                composable(
+                                    "invest",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
                                     val canGoBack = nav.previousBackStackEntry != null
                                     WithLocalizedContext(useHindiNumerals) {
                                         InvestmentScreen(
@@ -266,7 +288,11 @@ class MainActivity : AppCompatActivity() {
                                     arguments = listOf(androidx.navigation.navArgument("tab") {
                                         defaultValue = ""
                                         type = androidx.navigation.NavType.StringType
-                                    })
+                                    }),
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                                 ) { backStackEntry ->
                                     val tab = backStackEntry.arguments?.getString("tab")
                                     val canGoBack = nav.previousBackStackEntry != null
@@ -278,7 +304,13 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                 }
-                                composable("settings") {
+                                composable(
+                                    "settings",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
                                     com.example.wealthtracker.ui.screens.SettingsScreen(
                                         darkMode = darkMode,
                                         onToggleDarkMode = {
@@ -331,7 +363,12 @@ class MainActivity : AppCompatActivity() {
                                         if (!km.isDeviceSecure) {
                                             Text(text = "Set a device screen lock to protect the app")
                                             Spacer(Modifier.height(12.dp))
-                                            androidx.compose.material3.Button(onClick = { startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }) {
+                                            androidx.compose.material3.Button(onClick = { 
+                                                val intent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                startActivity(intent)
+                                            }) {
                                                 Text("Open Security Settings")
                                             }
                                         } else {

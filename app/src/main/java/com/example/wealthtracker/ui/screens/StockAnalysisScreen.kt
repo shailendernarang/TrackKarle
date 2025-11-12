@@ -415,21 +415,27 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
             run {
                 val ctx = androidx.compose.ui.platform.LocalContext.current
                 var adLoaded by remember { mutableStateOf(false) }
-                val adView = remember {
+                val adView = remember(ctx) {
                     com.google.android.gms.ads.AdView(ctx).apply {
                         adUnitId = "ca-app-pub-4934815537317220/1418248826"
                     }
                 }
-                LaunchedEffect(Unit) {
+                DisposableEffect(Unit) {
                     val dm = ctx.resources.displayMetrics
                     val adWidthDp = (dm.widthPixels / dm.density).toInt()
                     val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
                     adView.setAdSize(adaptiveSize)
                     adView.adListener = object : AdListener() {
                         override fun onAdLoaded() { adLoaded = true }
-                        override fun onAdFailedToLoad(error: LoadAdError) { adLoaded = false }
+                        override fun onAdFailedToLoad(error: LoadAdError) { 
+                            adLoaded = false
+                            android.util.Log.e("StockAnalysisAd", "Ad failed: ${error.message} (${error.code})")
+                        }
                     }
                     adView.loadAd(AdRequest.Builder().build())
+                    onDispose {
+                        adView.destroy()
+                    }
                 }
                 if (adLoaded) {
                     AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())

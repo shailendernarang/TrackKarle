@@ -1,6 +1,10 @@
 package com.example.wealthtracker.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -20,9 +24,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -107,21 +109,27 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
             // AdMob Adaptive Anchored banner at top (render only when loaded)
             run {
                 var adLoaded by remember { mutableStateOf(false) }
-                val adView = remember {
+                val adView = remember(ctx) {
                     com.google.android.gms.ads.AdView(ctx).apply {
                         adUnitId = "ca-app-pub-4934815537317220/1418248826"
                     }
                 }
-                LaunchedEffect(Unit) {
+                DisposableEffect(Unit) {
                     val dm = ctx.resources.displayMetrics
                     val adWidthDp = (dm.widthPixels / dm.density).toInt()
                     val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
                     adView.setAdSize(adaptiveSize)
                     adView.adListener = object : com.google.android.gms.ads.AdListener() {
                         override fun onAdLoaded() { adLoaded = true }
-                        override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { adLoaded = false }
+                        override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { 
+                            adLoaded = false
+                            android.util.Log.e("CalculatorsAd", "Ad failed: ${error.message} (${error.code})")
+                        }
                     }
                     adView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
+                    onDispose {
+                        adView.destroy()
+                    }
                 }
                 if (adLoaded) {
                     AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
@@ -245,6 +253,7 @@ fun SipCalculator() {
                 value = rate,
                 onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Expected Return (% p.a.)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -252,6 +261,7 @@ fun SipCalculator() {
                 value = years,
                 onValueChange = { years = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Tenure (years)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(12.dp))
@@ -284,6 +294,7 @@ fun LumpsumCalculator() {
                 value = rate,
                 onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Expected Return (% p.a.)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -291,6 +302,7 @@ fun LumpsumCalculator() {
                 value = years,
                 onValueChange = { years = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Tenure (years)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(12.dp))
@@ -430,6 +442,7 @@ fun FdCalculator(rateRows: List<FdRateRow>) {
                         value = rate,
                         onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                         label = { Text("Interest Rate (% p.a.)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(8.dp))
@@ -438,6 +451,7 @@ fun FdCalculator(rateRows: List<FdRateRow>) {
                         value = years,
                         onValueChange = { years = it.filter { c -> c.isDigit() || c == '.' } },
                         label = { Text("Tenure (years)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(8.dp))
@@ -503,20 +517,30 @@ fun FdRatesComparison(rateRows: List<FdRateRow>, selectedTenure: String, senior:
     }
 
     Spacer(Modifier.height(4.dp))
+    
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidthDp = cfg.screenWidthDp
+    // Responsive sizing: phone vs tablet
+    val isPhone = screenWidthDp < 600
+    val gridMinSize = if (isPhone) 110.dp else 140.dp
+    val gridHeight = if (isPhone) 300.dp else 240.dp
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("FD Rates ($norm)", style = MaterialTheme.typography.titleLarge)
+                Text("FD Rates ($norm)", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
                 ExposedDropdownMenuBox(expanded = sortExpanded, onExpandedChange = { sortExpanded = !sortExpanded }) {
                     OutlinedTextField(
                         readOnly = true,
                         value = sortLabel,
                         onValueChange = {},
-                        label = { Text("Sort") },
+                        label = { Text("Sort", style = MaterialTheme.typography.labelSmall) },
+                        textStyle = MaterialTheme.typography.bodySmall,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sortExpanded) },
-                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).widthIn(min = 200.dp)
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                            .widthIn(min = if (isPhone) 120.dp else 160.dp, max = if (isPhone) 140.dp else 180.dp)
+                            .heightIn(max = 52.dp)
                     )
                     ExposedDropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
                         listOf("Name: A → Z", "Name: Z → A", "Rate: High → Low", "Rate: Low → High").forEach { opt ->
@@ -531,8 +555,8 @@ fun FdRatesComparison(rateRows: List<FdRateRow>, selectedTenure: String, senior:
             Spacer(Modifier.height(8.dp))
 
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 140.dp),
-                modifier = Modifier.fillMaxWidth().height(240.dp),
+                columns = GridCells.Adaptive(minSize = gridMinSize),
+                modifier = Modifier.fillMaxWidth().height(gridHeight),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -588,6 +612,7 @@ fun PpfEpfCalculator() {
                 value = rate,
                 onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Expected Return (% p.a.)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -596,6 +621,7 @@ fun PpfEpfCalculator() {
                 value = years,
                 onValueChange = { years = it.filter { c -> c.isDigit() } },
                 label = { Text("Tenure (years)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
 
