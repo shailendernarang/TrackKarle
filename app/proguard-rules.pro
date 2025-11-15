@@ -114,10 +114,168 @@
 -dontwarn com.google.firebase.**
 
 ###############################
-# Google Mobile Ads           #
+# InMobi Ads SDK              #
+###############################
+-keep class com.inmobi.** { *; }
+-dontwarn com.inmobi.**
+-keep class com.inmobi.ads.** { *; }
+-keep class com.inmobi.media.** { *; }
+-keep class com.inmobi.sdk.** { *; }
+-keepattributes JavascriptInterface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# Keep specific InMobi classes referenced in the app
+-keep class com.inmobi.ads.InMobiBanner { *; }
+-keep class com.inmobi.ads.listeners.BannerAdEventListener { *; }
+-keep class com.inmobi.ads.InMobiAdRequestStatus { *; }
+-keep class com.inmobi.ads.AdMetaInfo { *; }
+-keep class com.inmobi.ads.exceptions.SdkNotInitializedException { *; }
+-keep class com.inmobi.sdk.InMobiSdk { *; }
+-keep class com.inmobi.sdk.SdkInitializationListener { *; }
+
+###############################
+# Google Mobile Ads (Legacy)  #
 ###############################
 -keep class com.google.android.gms.ads.** { *; }
 -dontwarn com.google.android.gms.**
+
+###############################
+# Locale and Country Selection  #
+###############################
+# Keep locale-related classes and methods
+-keep class java.util.Locale { *; }
+-keep class android.os.LocaleList { *; }
+-keep class androidx.core.os.LocaleListCompat { *; }
+-keep class androidx.appcompat.app.AppCompatDelegate { *; }
+-keepclassmembers class androidx.appcompat.app.AppCompatDelegate {
+    public static void setApplicationLocales(androidx.core.os.LocaleListCompat);
+}
+
+# Keep country and currency data classes
+-keep class com.example.wealthtracker.data.api.CurrencyInfo { *; }
+-keep class com.example.wealthtracker.data.api.CountryCurrencyData { *; }
+-keep class com.example.wealthtracker.util.CountryInfo { *; }
+-keepclassmembers class com.example.wealthtracker.data.api.** { *; }
+-keepclassmembers class com.example.wealthtracker.util.CountryCurrency { *; }
+
+# Keep sealed classes for loading states
+-keep class com.example.wealthtracker.ui.screens.LoadingState { *; }
+-keep class com.example.wealthtracker.ui.screens.LoadingState$* { *; }
+
+# Keep all data classes (they often use reflection)
+-keep @kotlin.Metadata class * extends kotlin.coroutines.jvm.internal.BaseContinuationImpl
+-keep class **.*$WhenMappings { *; }
+-keep class kotlin.Metadata { *; }
+
+# Keep Kotlin data classes and their synthetic methods
+-keepclassmembers class * {
+    synthetic <methods>;
+}
+-keepclassmembers class **.*$Companion { *; }
+-keepclassmembers class kotlin.Metadata {
+    public <methods>;
+}
+
+# Keep JSON parsing classes
+-keep class org.json.** { *; }
+-dontwarn org.json.**
+
+###############################
+# DataStore Preferences       #
+###############################
+# Keep DataStore classes and protobuf serialization
+-keep class androidx.datastore.** { *; }
+-keep class androidx.datastore.preferences.** { *; }
+-keep class androidx.datastore.preferences.protobuf.** { *; }
+-keep class androidx.datastore.core.** { *; }
+-dontwarn androidx.datastore.**
+
+# Keep protobuf classes used by DataStore
+-keep class * extends androidx.datastore.preferences.protobuf.GeneratedMessageLite { *; }
+-keepclassmembers class * extends androidx.datastore.preferences.protobuf.GeneratedMessageLite {
+    <fields>;
+    <methods>;
+}
+
+# Keep protobuf serialization internals
+-keep class androidx.datastore.preferences.protobuf.FieldSet { *; }
+-keep class androidx.datastore.preferences.protobuf.FieldSet$* { *; }
+-keep class androidx.datastore.preferences.protobuf.MapEntryLite { *; }
+-keep class androidx.datastore.preferences.protobuf.MapEntryLite$* { *; }
+-keep class androidx.datastore.preferences.protobuf.MapFieldSchemaLite { *; }
+-keep class androidx.datastore.preferences.protobuf.MessageSchema { *; }
+-keep class androidx.datastore.preferences.protobuf.AbstractMessageLite { *; }
+
+# Keep all protobuf methods that are called via reflection
+-keepclassmembers class androidx.datastore.preferences.protobuf.** {
+    public <methods>;
+    private <methods>;
+    protected <methods>;
+}
+
+# Prevent obfuscation of protobuf enums and their values
+-keepclassmembers enum androidx.datastore.preferences.protobuf.** {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# Keep PreferencesProto classes
+-keep class androidx.datastore.preferences.PreferencesProto { *; }
+-keep class androidx.datastore.preferences.PreferencesProto$* { *; }
+-keep class androidx.datastore.preferences.PreferencesMapCompat { *; }
+-keep class androidx.datastore.preferences.PreferencesMapCompat$* { *; }
+
+# Keep serializers
+-keep class androidx.datastore.preferences.core.PreferencesSerializer { *; }
+-keepclassmembers class androidx.datastore.preferences.core.PreferencesSerializer {
+    public <methods>;
+}
+
+# Keep exception classes for DataStore error handling
+-keep class androidx.datastore.core.CorruptionException { *; }
+-keep class java.io.IOException { *; }
+
+# Keep coroutines exception handling
+-keep class kotlinx.coroutines.flow.** { *; }
+-keepclassmembers class kotlinx.coroutines.flow.** {
+    public <methods>;
+}
+
+# Prevent aggressive optimization of protobuf serialization logic
+-keepclassmembers class androidx.datastore.preferences.protobuf.FieldSet {
+    private static *** computeElementSizeNoTag(...);
+    private static *** computeElementSize(...);
+    *** computeElementSizeNoTag(...);
+    *** computeElementSize(...);
+}
+-keepclassmembers class androidx.datastore.preferences.protobuf.MapEntryLite {
+    *** computeSerializedSize(...);
+    *** computeMessageSize(...);
+}
+-keepclassmembers class androidx.datastore.preferences.protobuf.MapFieldSchemaLite {
+    *** getSerializedSizeLite(...);
+    *** getSerializedSize(...);
+}
+
+# Keep all switch statements and enum handling in protobuf
+-keepclassmembers class androidx.datastore.preferences.protobuf.** {
+    *** ordinal();
+    *** name();
+    *** values();
+    *** valueOf(...);
+}
+
+# Keep WireFormat and related classes that handle field types
+-keep class androidx.datastore.preferences.protobuf.WireFormat { *; }
+-keep class androidx.datastore.preferences.protobuf.WireFormat$* { *; }
+
+# Keep DataStore OkIO storage classes
+-keep class androidx.datastore.core.okio.** { *; }
+-keepclassmembers class androidx.datastore.core.okio.** {
+    <methods>;
+}
 
 ###############################
 # App packages (conservative) #

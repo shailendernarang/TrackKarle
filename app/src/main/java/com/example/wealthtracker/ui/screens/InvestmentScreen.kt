@@ -1,5 +1,6 @@
 package com.example.wealthtracker.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.DateRange
@@ -34,11 +36,16 @@ import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.wealthtracker.ui.components.EditInvestmentBottomSheet
+import com.example.wealthtracker.ui.components.ModernSnackbarHost
+import com.example.wealthtracker.ui.components.showSuccessSnackbar
+import com.example.wealthtracker.ui.components.showDeleteSnackbar
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -56,8 +63,12 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -144,6 +155,10 @@ import com.example.wealthtracker.util.AverageRatesProvider
 import java.net.URL
 import kotlinx.coroutines.withContext
 import android.util.Log
+import com.inmobi.ads.InMobiBanner
+import com.inmobi.ads.AdMetaInfo
+import com.inmobi.ads.listeners.BannerAdEventListener
+import com.ss.wealthtracker.BuildConfig
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.rememberDatePickerState
@@ -363,10 +378,8 @@ fun InvestmentScreen(
     val message by viewModel.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     var editing by remember { mutableStateOf<InvestmentEntity?>(null) }
-    var editType by remember { mutableStateOf("") }
-    var editAmount by remember { mutableStateOf(TextFieldValue("")) }
-    var editInvType by remember { mutableStateOf(if (InvestmentTypes.all.contains("Others")) "Others" else InvestmentTypes.all.first()) }
-    var editBank by remember { mutableStateOf<String?>(null) }
+    var showEditBottomSheet by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     var amount by remember { mutableStateOf(TextFieldValue("")) }
     var invType by remember { mutableStateOf(if (InvestmentTypes.all.contains("FD")) "FD" else InvestmentTypes.all.first()) }
     var othersName by remember { mutableStateOf("") }
@@ -377,7 +390,8 @@ fun InvestmentScreen(
     var mfCommittedName by remember { mutableStateOf<String?>(null) }
     var mfHasFocus by remember { mutableStateOf(false) }
     var bankExpanded by remember { mutableStateOf(false) }
-    var selectedBank by remember { mutableStateOf<String?>(null) }
+    var selectedBank: String? by remember { mutableStateOf(null) }
+    var customBankName by remember { mutableStateOf("") }
     // FD extra fields
     var fdStartDate by remember { mutableStateOf("") }
     var fdMaturityDate by remember { mutableStateOf("") }
@@ -455,8 +469,8 @@ fun InvestmentScreen(
         }
     }
 
-    val amountError = amount.text.isNotBlank() && (amount.text.replace(",", "").toDoubleOrNull()?.let { it <= 0.0 } != false)
     var attemptedAdd by remember { mutableStateOf(false) }
+    val amountError = attemptedAdd && (amount.text.isBlank() || amount.text.replace(",", "").toDoubleOrNull()?.let { it <= 0.0 } != false)
     val bankError = attemptedAdd && invType == "FD" && (selectedBank == null)
     val othersNameError = attemptedAdd && invType == "Others" && othersName.isBlank()
     val mfNameError = false
@@ -595,7 +609,14 @@ fun InvestmentScreen(
     val isCompact = cfg.screenWidthDp < 600
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { 
+            Box(modifier = Modifier.imePadding()) {
+                ModernSnackbarHost(
+                    hostState = snackbar,
+                    bottomPadding = 88.dp // Position above FAB
+                )
+            }
+        },
         bottomBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (items.isNotEmpty()) {
@@ -608,33 +629,34 @@ fun InvestmentScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // AdMob Adaptive Anchored banner (collapse on no fill)
-                        run {
+                        if (BuildConfig.DEBUG) {
                             var adLoaded by remember { mutableStateOf(false) }
-                            val adView = remember(ctx) {
-                                com.google.android.gms.ads.AdView(ctx).apply {
-                                    adUnitId = "ca-app-pub-4934815537317220/1418248826"
-                                }
-                            }
+                            val banner = remember(ctx) { InMobiBanner(ctx, 10000535531L) }
                             DisposableEffect(Unit) {
-                                val dm = ctx.resources.displayMetrics
-                                val adWidthDp = (dm.widthPixels / dm.density).toInt()
-                                val adaptiveSize = com.google.android.gms.ads.AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
-                                adView.setAdSize(adaptiveSize)
-                                adView.adListener = object : com.google.android.gms.ads.AdListener() {
-                                    override fun onAdLoaded() { adLoaded = true }
-                                    override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { 
-                                        adLoaded = false
-                                        android.util.Log.e("InvestmentAd", "Ad failed: ${error.message} (${error.code})")
+                                banner.setBannerSize(320, 50)
+                                banner.setListener(object : BannerAdEventListener() {
+                                    override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
+                                        adLoaded = true
                                     }
-                                }
-                                adView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
-                                onDispose {
-                                    adView.destroy()
-                                }
+
+                                    override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
+                                        adLoaded = false
+                                        android.util.Log.e(
+                                            "InvestmentAd",
+                                            "InMobi banner failed: message=${status.message}, raw=$status"
+                                        )
+                                    }
+                                })
+                                banner.load()
+                                onDispose { banner.destroy() }
                             }
                             if (adLoaded) {
-                                AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
+                                AndroidView(
+                                    factory = { banner },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(50.dp)
+                                )
                                 Spacer(Modifier.height(6.dp))
                             }
                         }
@@ -732,30 +754,33 @@ fun InvestmentScreen(
         },
         floatingActionButton = {
             // Speed dial: quick access actions
-            val expanded = remember { mutableStateOf(false) }
             Column(horizontalAlignment = Alignment.End) {
-                AnimatedVisibility(visible = expanded.value) {
+                AnimatedVisibility(visible = expanded) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
                         ExtendedFloatingActionButton(
-                            onClick = { onOpenDashboard(); expanded.value = false },
+                            onClick = { onOpenDashboard(); expanded = false },
                             icon = { Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null) },
                             text = { Text(stringResource(id = R.string.title_dashboard)) }
                         )
                         ExtendedFloatingActionButton(
-                            onClick = { onOpenCalculators(); expanded.value = false },
+                            onClick = { onOpenCalculators(); expanded = false },
                             icon = { Icon(Icons.Default.Calculate, contentDescription = null) },
                             text = { Text("Calculators") }
                         )
                         ExtendedFloatingActionButton(
-                            onClick = { onOpenStocks(); expanded.value = false },
+                            onClick = { onOpenStocks(); expanded = false },
                             icon = { Icon(Icons.Default.Savings, contentDescription = null) },
-                            text = { Text("Stocks") }
+                            text = { Text("Stock Analysis") }
                         )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                FloatingActionButton(onClick = { expanded.value = !expanded.value }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                FloatingActionButton(
+                    onClick = { expanded = !expanded },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More")
                 }
             }
         }
@@ -800,30 +825,63 @@ fun InvestmentScreen(
                         OutlinedTextField(
                             value = amount,
                             onValueChange = { tf -> amount = formatIndianNumberTF(tf) },
-                            label = { Text(stringResource(R.string.label_amount)) },
+                            label = { 
+                                Text(
+                                    stringResource(R.string.label_amount),
+                                    style = MaterialTheme.typography.bodyMedium
+                                ) 
+                            },
                             placeholder = {
+                                val symbol = FormatUtils.getCurrencySymbol()
                                 val ph = when (invType) {
-                                    "FD" -> "Enter principal amount"
-                                    "Mutual Fund" -> "Enter investment amount"
-                                    "Stocks", "Equity" -> "Enter invested amount"
-                                    "Gold" -> "Enter purchase amount"
-                                    "PPF", "EPF", "NPS" -> "Enter contribution amount"
-                                    "Health Insurance", "Term Insurance" -> "Enter premium amount"
-                                    else -> "Enter amount"
+                                    "FD" -> "$symbol 1,00,000"
+                                    "Mutual Fund" -> "$symbol 50,000"
+                                    "Stocks", "Equity" -> "$symbol 25,000"
+                                    "Gold" -> "$symbol 10,000"
+                                    "PPF", "EPF", "NPS" -> "$symbol 1,50,000"
+                                    "Health Insurance", "Term Insurance" -> "$symbol 15,000"
+                                    else -> "$symbol 10,000"
                                 }
-                                Text(ph)
+                                Text(
+                                    ph,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.AccountBalance,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             },
                             singleLine = true,
                             isError = amountError,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp, max = 56.dp)
+                            textStyle = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = 0.5.sp
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 64.dp, max = 72.dp) // Increased height for better comma visibility
                         )
                     }
                     if (amountError) {
                         Text(stringResource(R.string.error_enter_valid_amount), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(Modifier.height(10.dp))
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize() // Smooth animation for FD-specific fields
+                    ) {
                         Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(
                             modifier = Modifier
@@ -847,7 +905,12 @@ fun InvestmentScreen(
                                             else -> Icons.Default.Savings
                                         }
                                         Icon(icon, contentDescription = null)
-                                    }
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
                                 )
                             }
                         }
@@ -892,7 +955,7 @@ fun InvestmentScreen(
                         Spacer(Modifier.height(12.dp))
                     }
                     AnimatedVisibility(visible = invType == "FD") {
-                        Box(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             val clickSrc = remember { MutableInteractionSource() }
                             OutlinedTextField(
                                 value = selectedBank ?: "Select Bank",
@@ -900,28 +963,33 @@ fun InvestmentScreen(
                                 label = { Text(stringResource(R.string.label_bank)) },
                                 isError = bankError,
                                 readOnly = true,
-                                trailingIcon = { IconButton(onClick = { bankExpanded = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } },
+                                trailingIcon = { 
+                                    IconButton(onClick = { bankExpanded = true }) { 
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null) 
+                                    } 
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable(indication = null, interactionSource = clickSrc) { bankExpanded = true }
                             )
-                            DropdownMenu(
-                                expanded = bankExpanded,
-                                onDismissRequest = { bankExpanded = false },
-                                offset = androidx.compose.ui.unit.DpOffset(0.dp, 8.dp)
-                            ) {
-                                val banksFromCsv = fdRates.map { it.bank }.distinct().sorted()
-                                banksFromCsv.forEach { bank ->
-                                    DropdownMenuItem(
-                                        leadingIcon = { BankAvatar(bank) },
-                                        text = { Text(bank) },
-                                        onClick = {
-                                            selectedBank = bank
-                                            bankExpanded = false
-                                        }
+                            // Show custom bank name field when Others is selected
+                            AnimatedVisibility(visible = selectedBank == "Others") {
+                                Column {
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(
+                                        value = customBankName,
+                                        onValueChange = { customBankName = it },
+                                        label = { Text("Enter Bank Name") },
+                                        placeholder = { Text("e.g., Chase Bank, HSBC, etc.") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
-                                DropdownMenuItem(text = { Text(stringResource(R.string.menu_others)) }, onClick = { selectedBank = "Others"; bankExpanded = false })
                             }
                         }
                     }
@@ -1286,11 +1354,17 @@ fun InvestmentScreen(
                                     "Equity" -> stockName.ifBlank { "Stocks" }
                                     else -> invType
                                 }
+                                // Determine final bank name (use custom if Others selected)
+                                val finalBankName = if (selectedBank == "Others" && customBankName.isNotBlank()) {
+                                    customBankName
+                                } else {
+                                    selectedBank
+                                }
                                 val entity = com.example.wealthtracker.data.local.InvestmentEntity(
                                     type = displayType,
                                     amount = amountValue!!,
                                     investmentType = if (invType == "Equity" || invType == "Stocks") "Stocks" else invType,
-                                    bankName = if (invType == "FD") selectedBank else null,
+                                    bankName = if (invType == "FD") finalBankName else null,
                                     fdStartDate = if (invType == "FD") fdStartDate.takeIf { it.isNotBlank() } else null,
                                     fdMaturityDate = if (invType == "FD") fdMaturityDate.takeIf { it.isNotBlank() } else null,
                                     fdRate = if (invType == "FD") fdRate.toDoubleOrNull() else null,
@@ -1311,6 +1385,7 @@ fun InvestmentScreen(
                                 // Clear inputs
                                 amount = TextFieldValue("")
                                 selectedBank = null
+                                customBankName = ""
                                 fdStartDate = ""; fdMaturityDate = ""; fdRate = ""
                                 mfName = ""; mfDate = ""
                                 ppfFy = null; ppfDate = ""
@@ -1359,7 +1434,11 @@ fun InvestmentScreen(
                         onClick = { viewModel.setTypeFilter(if (key == "All") null else key) },
                         label = { Text("$display (${FormatUtils.formatInt(count)})") },
                         leadingIcon = { Icon(icon, contentDescription = null) },
-                        colors = FilterChipDefaults.filterChipColors()
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     )
                 }
             }
@@ -1431,11 +1510,7 @@ fun InvestmentScreen(
                                     },
                                     onEdit = {
                                         editing = item
-                                        editType = item.type
-                                        val amtStr = java.math.BigDecimal(item.amount).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
-                                        editAmount = formatIndianNumberTF(TextFieldValue(amtStr))
-                                        editInvType = item.investmentType
-                                        editBank = item.bankName
+                                        showEditBottomSheet = true
                                     },
                                     highlight = (highlightId == item.id),
                                     onHighlightConsumed = { if (highlightId == item.id) highlightId = null }
@@ -1475,11 +1550,7 @@ fun InvestmentScreen(
                                     },
                                     onEdit = {
                                         editing = item
-                                        editType = item.type
-                                        val amtStr = java.math.BigDecimal(item.amount).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
-                                        editAmount = formatIndianNumberTF(TextFieldValue(amtStr))
-                                        editInvType = item.investmentType
-                                        editBank = item.bankName
+                                        showEditBottomSheet = true
                                     },
                                     highlight = (highlightId == item.id),
                                     onHighlightConsumed = { if (highlightId == item.id) highlightId = null }
@@ -1489,107 +1560,6 @@ fun InvestmentScreen(
                         }
                     }
                 }
-            }
-            // Edit Dialog
-            if (editing != null) {
-                var editBankExpanded by remember { mutableStateOf(false) }
-                AlertDialog(
-                    onDismissRequest = { editing = null },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            editing?.let { current ->
-                                viewModel.updateInvestment(current.id, editType, editAmount.text.replace(",", ""), editInvType, editBank)
-                                uiScope.launch {
-                                    delay(50)
-                                    highlightId = current.id
-                                }
-                            }
-                            editing = null
-                        }) { Text(stringResource(R.string.action_save)) }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { editing = null }) { Text(stringResource(R.string.action_cancel)) }
-                    },
-                    title = { Text(stringResource(R.string.dlg_title_edit_investment)) },
-                    text = {
-                        Column {
-                            // Type chips in edit
-                            Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Row(
-                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                InvestmentTypes.all.forEach { t ->
-                                    val selectedEdit = editInvType == t
-                                    FilterChip(
-                                        selected = selectedEdit,
-                                        onClick = { editInvType = t; if (t != "FD") editBank = null },
-                                        label = { Text(if (t == "FD") stringResource(R.string.fixed_deposit) else t) },
-                                        leadingIcon = {
-                                            val icon = when (t) {
-                                                "FD" -> Icons.Default.AccountBalance
-                                                "Mutual Fund", "NPS", "Equity" -> Icons.AutoMirrored.Filled.TrendingUp
-                                                "Gold" -> Icons.Default.Savings
-                                                "PPF", "EPF" -> Icons.Default.AccountBalance
-                                                "Term Insurance", "Health Insurance" -> Icons.Default.Savings
-                                                else -> Icons.Default.Savings
-                                            }
-                                            Icon(icon, contentDescription = null)
-                                        }
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(12.dp))
-                            if (editInvType == "Others") {
-                                OutlinedTextField(
-                                    value = editType,
-                                    onValueChange = { editType = it },
-                                    label = { Text(stringResource(R.string.name_investment)) },
-                                    placeholder = { Text(stringResource(R.string.hint_investment_name)) },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Spacer(Modifier.height(12.dp))
-                            }
-                            if (editInvType == "FD") {
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    val clickSrc2 = remember { MutableInteractionSource() }
-                                    OutlinedTextField(
-                                        value = editBank ?: "Select Bank",
-                                        onValueChange = {},
-                                        label = { Text(stringResource(R.string.label_bank)) },
-                                        readOnly = true,
-                                        trailingIcon = { IconButton(onClick = { editBankExpanded = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) } },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable(indication = null, interactionSource = clickSrc2) { editBankExpanded = true }
-                                    )
-                                    DropdownMenu(
-                                        expanded = editBankExpanded,
-                                        onDismissRequest = { editBankExpanded = false },
-                                        offset = androidx.compose.ui.unit.DpOffset(0.dp, 8.dp)
-                                    ) {
-                                        DropdownMenuItem(text = { Text("Others") }, onClick = { editBank = "Others"; editBankExpanded = false })
-                                        IndianBanks.all.forEach { bank ->
-                                            DropdownMenuItem(leadingIcon = { BankAvatar(bank) }, text = { Text(bank) }, onClick = { editBank = bank; editBankExpanded = false })
-                                        }
-                                    }
-                                }
-                                Spacer(Modifier.height(12.dp))
-                            }
-                            // Removed display name field as requested
-                            OutlinedTextField(
-                                value = editAmount,
-                                onValueChange = { tf -> editAmount = formatIndianNumberTF(tf) },
-                                label = { Text("Amount") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            // Values saved via confirmButton closure
-                        }
-                    }
-                )
             }
 
             // Removed legacy export/import dialogs; sharing now generates files directly
@@ -1619,6 +1589,106 @@ fun InvestmentScreen(
                             composition = comp,
                             progress = { animState.progress },
                             modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+            
+            
+            // Scrim for FAB menu - inside content so FAB renders on top
+            if (expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            expanded = false
+                        }
+                )
+            }
+        }
+    }
+    
+    // Modern Edit Bottom Sheet
+    if (showEditBottomSheet && editing != null) {
+        EditInvestmentBottomSheet(
+            investment = editing!!,
+            onDismiss = { 
+                showEditBottomSheet = false
+                editing = null
+            },
+            onSave = { updatedInvestment ->
+                viewModel.updateInvestment(updatedInvestment)
+                showEditBottomSheet = false
+                editing = null
+                uiScope.launch {
+                    snackbar.showSuccessSnackbar("Investment updated successfully")
+                }
+            },
+            onDelete = {
+                val toDelete = editing!!
+                viewModel.delete(toDelete)
+                showEditBottomSheet = false
+                editing = null
+                uiScope.launch {
+                    snackbar.showDeleteSnackbar(
+                        itemName = toDelete.investmentType,
+                        onUndo = { viewModel.reAdd(toDelete) }
+                    )
+                }
+            }
+        )
+    }
+    
+    // Bank Selection Bottom Sheet
+    if (bankExpanded) {
+        ModalBottomSheet(
+            onDismissRequest = { bankExpanded = false },
+            sheetState = rememberModalBottomSheetState()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                Text(
+                    text = "Select Bank",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+                
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val banksFromCsv = fdRates.map { it.bank }.distinct().sorted()
+                    items(banksFromCsv) { bank ->
+                        ListItem(
+                            headlineContent = { Text(bank) },
+                            leadingContent = { BankAvatar(bank) },
+                            modifier = Modifier.clickable {
+                                selectedBank = bank
+                                bankExpanded = false
+                            }
+                        )
+                    }
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.menu_others)) },
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                selectedBank = "Others"
+                                bankExpanded = false
+                            }
                         )
                     }
                 }

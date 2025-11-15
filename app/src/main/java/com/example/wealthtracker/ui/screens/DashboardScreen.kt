@@ -46,21 +46,17 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.ImageLoader
 import coil.decode.SvgDecoder
-import com.google.android.gms.ads.AdSize
+import com.inmobi.ads.InMobiBanner
+import com.inmobi.ads.AdMetaInfo
+import com.inmobi.ads.listeners.BannerAdEventListener
+import com.ss.wealthtracker.BuildConfig
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.wealthtracker.data.local.InvestmentEntity
 import com.example.wealthtracker.ui.InvestmentViewModel
 import com.example.wealthtracker.util.FormatUtils
-
-private data class Reminder(
-    val id: String,
-    val title: String,
-    val investmentType: String,
-    val action: String,
-    val whenText: String,
-    val color: Color
-)
+import com.example.wealthtracker.ui.components.RatingPromptDialog
+import com.example.wealthtracker.ui.components.RatingPromptManager
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -69,23 +65,40 @@ fun DashboardScreen(
     onAddClick: () -> Unit,
     onOpenInvestments: () -> Unit,
     onOpenCalculators: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    onOpenReminders: () -> Unit = {}
 ) {
     val allItems by viewModel.investments.collectAsState()
     val filtered by viewModel.filteredInvestments.collectAsState()
     val typeFilter by viewModel.typeFilter.collectAsState()
     
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    val reminderManager = remember { com.example.wealthtracker.data.ReminderManager.getInstance(ctx) }
+    val reminders by reminderManager.reminders.collectAsState()
+    
+    // Sync reminders when investments change
+    LaunchedEffect(allItems) {
+        reminderManager.syncRemindersFromInvestments(allItems)
+        reminderManager.refreshSnoozedReminders()
+    }
     val activity = remember(ctx) { 
         ctx as? android.app.Activity ?: (ctx as? androidx.appcompat.view.ContextThemeWrapper)?.baseContext as? android.app.Activity
     }
-    val prefs = remember { ctx.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE) }
-    var showReminderCarousel by rememberSaveable { mutableStateOf(true) }
-    var startupShown by rememberSaveable { mutableStateOf(prefs.getInt("startup_shown", 0)) }
-
     var vizType by remember { mutableStateOf("Pie") }
     val cfgTop = LocalConfiguration.current
     val isWideTop = cfgTop.screenWidthDp >= 700
+    
+    // Rating prompt state
+    var showRatingPrompt by remember { mutableStateOf(false) }
+    
+    // Check if we should show rating prompt
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(3000) // Wait 3 seconds after opening
+        if (RatingPromptManager.shouldShowPrompt(ctx)) {
+            showRatingPrompt = true
+            RatingPromptManager.markPromptShown(ctx)
+        }
+    }
 
     // Double-back-to-exit from home (Dashboard)
     var backPressedOnce by remember { mutableStateOf(false) }
@@ -106,37 +119,6 @@ fun DashboardScreen(
             }
         }
     }
-    
-    // Upcoming reminders: build list (FD <90d, Insurance <60d)
-    val fdSoonList = allItems.filter { it.investmentType == "FD" }.mapNotNull { e ->
-        e.fdMaturityDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } }
-    }.filter { (date, _) ->
-        val days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), date).toInt()
-        days in 0..90
-    }.sortedBy { it.first }
-    val hiSoonList = allItems.filter { it.investmentType == "Health Insurance" }.mapNotNull { e ->
-        e.hiRenewalDate?.let { d -> parseUiDateDashboard(d)?.let { it to e } }
-    }.filter { (date, _) ->
-        val days = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), date).toInt()
-        days in 0..60
-    }.sortedBy { it.first }
-    val ackSet = remember { prefs.getStringSet("ack_ids", emptySet())?.toMutableSet() ?: mutableSetOf() }
-    // Capture colors outside remember to avoid composable reads inside remember
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val tertiaryColor = MaterialTheme.colorScheme.tertiary
-    val reminders = remember(allItems) {
-        buildList {
-            fdSoonList.forEach { (d, e) ->
-                add(Reminder("FD:${e.id}", e.bankName ?: "Fixed Deposit", "Fixed Deposit", "Maturity", formatAddedOnDashboard(d), primaryColor))
-            }
-            hiSoonList.forEach { (d, e) ->
-                add(Reminder("HI:${e.id}", e.hiPolicyName?.takeIf { it.isNotBlank() } ?: "Health Insurance", "Health Insurance", "Renewal", formatAddedOnDashboard(d), tertiaryColor))
-            }
-        }
-            .filter { it.id !in ackSet }
-            .takeIf { it.isNotEmpty() } ?: emptyList()
-    }
-    val canShow = showReminderCarousel && reminders.isNotEmpty() && startupShown < 3
     
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -161,41 +143,41 @@ fun DashboardScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // AdMob Adaptive Anchored banner (collapse on no fill)
-                    run {
+                    if (BuildConfig.DEBUG) {
                         var adLoaded by remember { mutableStateOf(false) }
-                        val adView = remember(ctx) {
-                            com.google.android.gms.ads.AdView(ctx).apply {
-                                adUnitId = "ca-app-pub-4934815537317220/1418248826"
-                            }
+                        val banner = remember(ctx) {
+                            InMobiBanner(ctx, /* placementId = */ 10000535531L)
                         }
-                        
                         DisposableEffect(Unit) {
-                            val dm = ctx.resources.displayMetrics
-                            val adWidthDp = (dm.widthPixels / dm.density).toInt()
-                            val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
-                            adView.setAdSize(adaptiveSize)
-                            adView.adListener = object : com.google.android.gms.ads.AdListener() {
-                                override fun onAdLoaded() { 
-                                    adLoaded = true 
+                            banner.setBannerSize(320, 50)
+                            banner.setListener(object : BannerAdEventListener() {
+                                override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
+                                    adLoaded = true
                                 }
-                                override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { 
+
+                                override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
                                     adLoaded = false
-                                    android.util.Log.e("DashboardAd", "Ad failed to load: ${error.message} (Code: ${error.code})")
+                                    android.util.Log.e(
+                                        "DashboardAd",
+                                        "InMobi banner failed: message=${status.message}, raw=$status"
+                                    )
                                 }
-                            }
-                            adView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
-                            
+                            })
+                            banner.load()
                             onDispose {
-                                adView.destroy()
+                                banner.destroy()
                             }
                         }
-                        
                         if (adLoaded) {
-                            AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
-                            Spacer(Modifier.height(6.dp))
+                            AndroidView(
+                                factory = { banner },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                            )
                         }
                     }
+                    Spacer(Modifier.height(6.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -213,23 +195,11 @@ fun DashboardScreen(
             }
         },
         floatingActionButton = {
-            if (isWideTop) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    FloatingActionButton(onClick = onOpenCalculators) {
-                        Icon(Icons.Default.Calculate, contentDescription = "Open Calculators")
-                    }
-                    ExtendedFloatingActionButton(
-                        onClick = onAddClick,
-                        icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                        text = { Text(stringResource(id = com.ss.wealthtracker.R.string.btn_add_investment)) }
-                    )
-                }
-            } else {
-                FloatingActionButton(onClick = onAddClick) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(id = com.ss.wealthtracker.R.string.btn_add_investment))
-                }
+            FloatingActionButton(onClick = onAddClick) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(id = com.ss.wealthtracker.R.string.btn_add_investment))
             }
-        }
+        },
+        floatingActionButtonPosition = FabPosition.End
     ) { inner ->
         val contentModifier = if (isWideTop) {
             Modifier.fillMaxSize().padding(inner).padding(16.dp)
@@ -261,7 +231,12 @@ fun DashboardScreen(
                         selected = selected,
                         onClick = { viewModel.setTypeFilter(if (key == "All") null else key) },
                         label = { Text("$display (${FormatUtils.formatInt(count)})") },
-                        leadingIcon = { Icon(icon, contentDescription = null) }
+                        leadingIcon = { Icon(icon, contentDescription = null) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     )
                 }
             }
@@ -281,6 +256,27 @@ fun DashboardScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+            
+            // Enhanced Insights Section - Filter Aware
+            com.example.wealthtracker.ui.components.EnhancedInsights(
+                investments = allItems,
+                currentFilter = typeFilter
+            )
+            
+            // Portfolio Analysis Section
+            com.example.wealthtracker.ui.components.PortfolioAnalysisCard(
+                investments = allItems
+            )
+            
+            // Reminders Section
+            Spacer(Modifier.height(16.dp))
+            val activeReminders by reminderManager.activeReminders.collectAsState()
+            com.example.wealthtracker.ui.components.DashboardRemindersSection(
+                reminders = activeReminders,
+                onGotIt = { reminderManager.dismissReminder(it.id) },
+                onRemindLater = { reminderManager.snoozeReminder(it.id) },
+                onViewAll = onOpenReminders
+            )
             
             val cfg = LocalConfiguration.current
             val isWide = cfg.screenWidthDp >= 700
@@ -302,7 +298,7 @@ fun DashboardScreen(
                             if (recent.isNotEmpty()) {
                                 Text(stringResource(id = com.ss.wealthtracker.R.string.recent_investments), style = MaterialTheme.typography.titleLarge)
                                 HorizontalDivider()
-                                LazyColumn(modifier = Modifier.fillMaxHeight(), contentPadding = PaddingValues(bottom = 12.dp)) {
+                                LazyColumn(modifier = Modifier.fillMaxHeight(), contentPadding = PaddingValues(bottom = 96.dp)) {
                                     items(recent) { e ->
                                         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                             val icon = when (e.investmentType) {
@@ -348,14 +344,12 @@ fun DashboardScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    InsightsSection(allItems = insightItems, currentFilter = typeFilter)
+                    // Enhanced insights are already shown above - no need for duplicate
                 }
             } else {
                 // Phone layout: stacked sections
                 ChartSectionDashboard(items = filtered, filter = typeFilter, vizType = vizType, onVizTypeChange = { vizType = it })
-                // Insights
-                InsightsSection(allItems = insightItems, currentFilter = typeFilter)
+                // Enhanced insights are already shown above - no need for duplicate
                 // Recent investments
                 if (recent.isNotEmpty()) {
                     Text(stringResource(id = com.ss.wealthtracker.R.string.recent_investments), style = MaterialTheme.typography.titleLarge)
@@ -406,183 +400,17 @@ fun DashboardScreen(
         }
     }
     }
-    
-    // Reminder overlay - covers entire screen including topBar/bottomBar
-    if (canShow) {
-        LaunchedEffect(Unit) {
-            startupShown += 1
-            prefs.edit().putInt("startup_shown", startupShown).apply()
-        }
-        val pager = rememberPagerState(pageCount = { reminders.size })
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.75f))
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) { }
-        ) {
-            Card(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(24.dp)
-                    .fillMaxWidth(0.9f)
-                    .wrapContentHeight(),
-                shape = RoundedCornerShape(20.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Header with close button
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Reminder",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        IconButton(
-                            onClick = { showReminderCarousel = false },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    
-                    // Pager content
-                    HorizontalPager(state = pager) { idx ->
-                        val r = reminders[idx]
-                        Column(
-                            Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Title with investment type badge
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    color = r.color.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text(
-                                        r.investmentType,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Medium,
-                                        color = r.color,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                            Text(
-                                r.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            
-                            // Due date card with action label
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                color = r.color.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Row(
-                                    Modifier.padding(16.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            "${r.action} Date",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            r.whenText,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = r.color
-                                        )
-                                    }
-                                    Icon(
-                                        Icons.Default.Savings,
-                                        contentDescription = null,
-                                        tint = r.color,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Page indicators
-                    if (reminders.size > 1) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            repeat(reminders.size) { i ->
-                                val active = pager.currentPage == i
-                                Box(
-                                    Modifier
-                                        .padding(horizontal = 3.dp)
-                                        .size(if (active) 8.dp else 6.dp)
-                                        .background(
-                                            if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                            CircleShape
-                                        )
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Action buttons
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                showReminderCarousel = false
-                                Toast.makeText(ctx, "We'll remind you next time you open the app", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Later")
-                        }
-                        Button(
-                            onClick = {
-                                val current = reminders[pager.currentPage]
-                                ackSet += current.id
-                                prefs.edit().putStringSet("ack_ids", ackSet).apply()
-                                if (pager.currentPage == reminders.lastIndex) {
-                                    showReminderCarousel = false
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Got it")
-                        }
-                    }
-                }
-            }
-        }
     }
+    
+    // Rating prompt dialog
+    if (showRatingPrompt) {
+        RatingPromptDialog(
+            onDismiss = { showRatingPrompt = false },
+            onRated = {
+                RatingPromptManager.markUserRated(ctx)
+                showRatingPrompt = false
+            }
+        )
     }
 }
 
@@ -1026,44 +854,60 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
             // Resolve dynamic text colors based on theme
             val onSurface = MaterialTheme.colorScheme.onSurface.toArgb()
             val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(id = com.ss.wealthtracker.R.string.overall_allocation), style = MaterialTheme.typography.titleMedium)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val selectedBg = MaterialTheme.colorScheme.primary
-                    val selectedText = MaterialTheme.colorScheme.onPrimary
-                    val unselectedBg = Color.Transparent
-                    val unselectedText = MaterialTheme.colorScheme.onSurfaceVariant
-                    // Pie segment
-                    Box(
+            if (data.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(id = com.ss.wealthtracker.R.string.overall_allocation), style = MaterialTheme.typography.titleMedium)
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (vizType == "Pie") selectedBg else unselectedBg)
-                            .clickable { if (vizType != "Pie") onVizTypeChange("Pie") }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(stringResource(id = com.ss.wealthtracker.R.string.viz_pie), color = if (vizType == "Pie") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
-                    }
-                    // Bar segment
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (vizType == "Bar") selectedBg else unselectedBg)
-                            .clickable { if (vizType != "Bar") onVizTypeChange("Bar") }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(stringResource(id = com.ss.wealthtracker.R.string.viz_bar), color = if (vizType == "Bar") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
+                        val selectedBg = MaterialTheme.colorScheme.primary
+                        val selectedText = MaterialTheme.colorScheme.onPrimary
+                        val unselectedBg = Color.Transparent
+                        val unselectedText = MaterialTheme.colorScheme.onSurfaceVariant
+                        // Pie segment
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (vizType == "Pie") selectedBg else unselectedBg)
+                                .clickable { if (vizType != "Pie") onVizTypeChange("Pie") }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(stringResource(id = com.ss.wealthtracker.R.string.viz_pie), color = if (vizType == "Pie") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
+                        }
+                        // Bar segment
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (vizType == "Bar") selectedBg else unselectedBg)
+                                .clickable { if (vizType != "Bar") onVizTypeChange("Bar") }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(stringResource(id = com.ss.wealthtracker.R.string.viz_bar), color = if (vizType == "Bar") selectedText else unselectedText, style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
+                Spacer(Modifier.height(6.dp))
             }
-            Spacer(Modifier.height(6.dp))
             if (data.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { Text(stringResource(id = com.ss.wealthtracker.R.string.no_data_to_visualize), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Savings,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            stringResource(id = com.ss.wealthtracker.R.string.no_data_to_visualize),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
             } else if (vizType == "Pie") {
                 var selectedLabel by remember(items, filter) { mutableStateOf<String?>(null) }
                 var animateOnToggle by remember(items, filter, vizType) { mutableStateOf(true) }

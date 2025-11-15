@@ -1,5 +1,6 @@
 package com.example.wealthtracker.util
 
+import android.content.Context
 import java.text.NumberFormat
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -7,48 +8,102 @@ import java.util.Locale
 
 object FormatUtils {
     @Volatile private var useHindiNumerals: Boolean = false
+    @Volatile private var currencySymbol: String = "₹"
+    @Volatile private var currencyCode: String = "INR"
+    @Volatile private var countryCode: String = "IN"
 
     fun setUseHindiNumerals(enabled: Boolean) {
         useHindiNumerals = enabled
     }
+    
+    fun setCurrency(symbol: String, code: String, country: String) {
+        currencySymbol = symbol
+        currencyCode = code
+        countryCode = country
+    }
+    
+    fun getCurrencySymbol(): String = currencySymbol
 
     private fun currency(): NumberFormat {
-        val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
+        val language = if (useHindiNumerals) "hi" else "en"
+        val loc = Locale(language, countryCode)
         val nf = NumberFormat.getCurrencyInstance(loc).apply {
             maximumFractionDigits = 2
             minimumFractionDigits = 0
         }
-        if (useHindiNumerals && nf is DecimalFormat) {
-            val dfs = DecimalFormatSymbols(loc).apply {
-                // Set Devanagari digits
-                zeroDigit = '\u0966' // ०
+        
+        // Override currency symbol if using custom currency
+        if (nf is DecimalFormat) {
+            val dfs = nf.decimalFormatSymbols
+            dfs.currencySymbol = currencySymbol
+            
+            if (useHindiNumerals) {
+                // Set Devanagari digits for Hindi
+                dfs.zeroDigit = '\u0966' // ०
             }
+            
             nf.decimalFormatSymbols = dfs
         }
         return nf
     }
 
-    fun formatINR(amount: Double): String {
+    fun formatCurrency(amount: Double): String {
         return currency().format(amount)
     }
+    
+    // Backward compatibility
+    fun formatINR(amount: Double): String {
+        return formatCurrency(amount)
+    }
 
-    fun formatINRShort(amount: Double): String {
+    fun formatCurrencyShort(amount: Double): String {
         val abs = kotlin.math.abs(amount)
-        return when {
-            abs >= 1_00_00_000 -> {
-                val cr = amount / 1_00_00_000.0
-                String.format(Locale.ENGLISH, "%.2f Cr", cr)
+        
+        // Use different abbreviations based on country
+        return when (countryCode) {
+            "IN" -> {
+                // Indian numbering system (Lakhs, Crores)
+                when {
+                    abs >= 1_00_00_000 -> {
+                        val cr = amount / 1_00_00_000.0
+                        "${currencySymbol}${String.format(Locale.ENGLISH, "%.2f", cr)} Cr"
+                    }
+                    abs >= 1_00_000 -> {
+                        val lakh = amount / 1_00_000.0
+                        "${currencySymbol}${String.format(Locale.ENGLISH, "%.2f", lakh)} L"
+                    }
+                    else -> formatCurrency(amount)
+                }
             }
-            abs >= 1_00_000 -> {
-                val lakh = amount / 1_00_000.0
-                String.format(Locale.ENGLISH, "%.2f L", lakh)
+            else -> {
+                // International numbering system (K, M, B)
+                when {
+                    abs >= 1_000_000_000 -> {
+                        val b = amount / 1_000_000_000.0
+                        "${currencySymbol}${String.format(Locale.ENGLISH, "%.2f", b)}B"
+                    }
+                    abs >= 1_000_000 -> {
+                        val m = amount / 1_000_000.0
+                        "${currencySymbol}${String.format(Locale.ENGLISH, "%.2f", m)}M"
+                    }
+                    abs >= 1_000 -> {
+                        val k = amount / 1_000.0
+                        "${currencySymbol}${String.format(Locale.ENGLISH, "%.2f", k)}K"
+                    }
+                    else -> formatCurrency(amount)
+                }
             }
-            else -> formatINR(amount)
         }
+    }
+    
+    // Backward compatibility
+    fun formatINRShort(amount: Double): String {
+        return formatCurrencyShort(amount)
     }
 
     fun formatPercent(value: Double): String {
-        val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
+        val language = if (useHindiNumerals) "hi" else "en"
+        val loc = Locale(language, countryCode)
         val pattern = "#,##0.0%"
         val df = DecimalFormat(pattern, DecimalFormatSymbols(loc)).apply {
             maximumFractionDigits = 1
@@ -65,13 +120,24 @@ object FormatUtils {
     }
 
     fun formatInt(value: Int): String {
-        val loc = if (useHindiNumerals) Locale("hi", "IN") else Locale("en", "IN")
+        val language = if (useHindiNumerals) "hi" else "en"
+        val loc = Locale(language, countryCode)
         val nf = NumberFormat.getIntegerInstance(loc)
         if (useHindiNumerals && nf is DecimalFormat) {
             val dfs = DecimalFormatSymbols(loc).apply { zeroDigit = '\u0966' }
             nf.decimalFormatSymbols = dfs
         }
         return nf.format(value)
+    }
+    
+    // Initialize currency from UserPreferences
+    fun init(context: Context) {
+        val prefs = com.example.wealthtracker.data.UserPreferences(context)
+        if (prefs.isCountrySet()) {
+            currencySymbol = prefs.getCurrencySymbol()
+            currencyCode = prefs.getCurrencyCode()
+            countryCode = prefs.getCountryCode()
+        }
     }
 }
 
@@ -101,6 +167,7 @@ object IndianBanks {
         "Bank of Baroda",
         "IDFC FIRST Bank",
         "Union Bank of India",
-        "Canara Bank"
+        "Canara Bank",
+        "Others (Custom Bank)"
     )
 }

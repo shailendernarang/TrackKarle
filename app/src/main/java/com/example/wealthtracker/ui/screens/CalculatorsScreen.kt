@@ -29,7 +29,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ss.wealthtracker.R
-import com.google.android.gms.ads.AdSize
+import com.inmobi.ads.InMobiBanner
+import com.inmobi.ads.AdMetaInfo
+import com.inmobi.ads.listeners.BannerAdEventListener
+import com.ss.wealthtracker.BuildConfig
 import kotlin.math.pow
 
 // ------------------------ DATA + HELPERS ------------------------
@@ -106,33 +109,34 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 .padding(16.dp)
         ) {
             val ctx = LocalContext.current
-            // AdMob Adaptive Anchored banner at top (render only when loaded)
-            run {
+            if (BuildConfig.DEBUG) {
                 var adLoaded by remember { mutableStateOf(false) }
-                val adView = remember(ctx) {
-                    com.google.android.gms.ads.AdView(ctx).apply {
-                        adUnitId = "ca-app-pub-4934815537317220/1418248826"
-                    }
-                }
+                val banner = remember(ctx) { InMobiBanner(ctx, 10000535531L) }
                 DisposableEffect(Unit) {
-                    val dm = ctx.resources.displayMetrics
-                    val adWidthDp = (dm.widthPixels / dm.density).toInt()
-                    val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
-                    adView.setAdSize(adaptiveSize)
-                    adView.adListener = object : com.google.android.gms.ads.AdListener() {
-                        override fun onAdLoaded() { adLoaded = true }
-                        override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { 
-                            adLoaded = false
-                            android.util.Log.e("CalculatorsAd", "Ad failed: ${error.message} (${error.code})")
+                    banner.setBannerSize(320, 50)
+                    banner.setListener(object : BannerAdEventListener() {
+                        override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
+                            adLoaded = true
                         }
-                    }
-                    adView.loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
-                    onDispose {
-                        adView.destroy()
-                    }
+
+                        override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
+                            adLoaded = false
+                            android.util.Log.e(
+                                "CalculatorsAd",
+                                "InMobi banner failed: message=${status.message}, raw=$status"
+                            )
+                        }
+                    })
+                    banner.load()
+                    onDispose { banner.destroy() }
                 }
                 if (adLoaded) {
-                    AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
+                    AndroidView(
+                        factory = { banner },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }

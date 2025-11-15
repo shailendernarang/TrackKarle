@@ -2,6 +2,10 @@ package com.example.wealthtracker.ui.charts
 
 import android.content.Context
 import android.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import com.github.mikephil.charting.animation.Easing
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.PieChart
@@ -14,6 +18,47 @@ import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
 
 object ChartUtils {
+    
+    @Composable
+    fun getDarkModeAwareColors(): List<Int> {
+        val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+        return if (isDarkTheme) {
+            // Dark mode colors - more vibrant and visible on dark backgrounds
+            listOf(
+                Color.parseColor("#BB86FC"), // Purple
+                Color.parseColor("#03DAC6"), // Teal
+                Color.parseColor("#CF6679"), // Pink
+                Color.parseColor("#FFB74D"), // Orange
+                Color.parseColor("#81C784"), // Green
+                Color.parseColor("#64B5F6"), // Blue
+                Color.parseColor("#F06292"), // Pink
+                Color.parseColor("#A1C181")  // Light Green
+            )
+        } else {
+            // Light mode colors - standard Material colors
+            listOf(
+                Color.parseColor("#2196F3"), // Blue
+                Color.parseColor("#4CAF50"), // Green
+                Color.parseColor("#FF9800"), // Orange
+                Color.parseColor("#9C27B0"), // Purple
+                Color.parseColor("#F44336"), // Red
+                Color.parseColor("#00BCD4"), // Cyan
+                Color.parseColor("#795548"), // Brown
+                Color.parseColor("#607D8B")  // Blue Grey
+            )
+        }
+    }
+    
+    @Composable
+    fun getTextColor(): Int {
+        return MaterialTheme.colorScheme.onSurface.toArgb()
+    }
+    
+    @Composable
+    fun getBackgroundColor(): Int {
+        return MaterialTheme.colorScheme.surface.toArgb()
+    }
+
     fun createPieChart(context: Context, onSurface: Int): PieChart =
         PieChart(context).apply {
             description.isEnabled = false

@@ -112,26 +112,10 @@ class InvestmentViewModel @Inject constructor(
         }
     }
 
-    fun updateInvestment(
-        id: Long,
-        newDisplayType: String,
-        newAmountInput: String,
-        newInvestmentType: String,
-        newBank: String?
-    ) {
-        val amount = parseAmount(newAmountInput) ?: return
-        val cleanType = newDisplayType.trim().ifEmpty { newInvestmentType }
-        val current = investments.value.firstOrNull { it.id == id } ?: return
+    fun updateInvestment(updatedEntity: InvestmentEntity) {
         viewModelScope.launch {
-            repo.updateInvestment(
-                current.copy(
-                    type = cleanType,
-                    amount = amount,
-                    investmentType = newInvestmentType,
-                    bankName = if (newInvestmentType == "FD") newBank else null
-                )
-            )
-            _message.value = "Updated"
+            repo.updateInvestment(updatedEntity)
+            // Message removed - parent screen shows its own success message
         }
     }
 

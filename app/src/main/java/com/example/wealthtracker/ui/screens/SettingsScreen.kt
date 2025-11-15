@@ -3,11 +3,16 @@ package com.example.wealthtracker.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,7 +41,8 @@ fun SettingsScreen(
     onToggleRequireDeviceLock: () -> Unit,
     useHindiNumerals: Boolean,
     onToggleHindiNumerals: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenReferral: (() -> Unit)? = null
 ) {
     Scaffold(
         topBar = {
@@ -75,6 +81,34 @@ fun SettingsScreen(
                 onToggle = onToggleHindiNumerals
             )
             HorizontalDivider()
+            
+            // Referral section
+            if (onOpenReferral != null) {
+                androidx.compose.material3.TextButton(
+                    onClick = onOpenReferral,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Invite Friends",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                HorizontalDivider()
+            }
+            
             // App info
             val appName = try {
                 val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, 0)

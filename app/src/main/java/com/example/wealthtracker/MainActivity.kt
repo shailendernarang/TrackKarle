@@ -37,6 +37,12 @@ import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.wealthtracker.ui.screens.InvestmentScreen
 import com.example.wealthtracker.ui.screens.DashboardScreen
+import com.example.wealthtracker.ui.screens.OnboardingScreen
+import com.example.wealthtracker.ui.screens.OnboardingPrefs
+import com.example.wealthtracker.ui.screens.ReferralScreen
+import com.example.wealthtracker.ui.screens.CountrySelectionScreen
+import com.example.wealthtracker.ui.screens.ModernSplashScreen
+import com.example.wealthtracker.data.UserPreferences
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -67,12 +73,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.RequestConfiguration
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import com.inmobi.sdk.InMobiSdk
+import com.inmobi.sdk.SdkInitializationListener
+import org.json.JSONObject
 import com.google.firebase.messaging.FirebaseMessaging
 import com.ss.wealthtracker.R
+import com.ss.wealthtracker.BuildConfig
 import androidx.compose.ui.res.stringResource
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
@@ -90,6 +97,10 @@ import android.content.Intent
 import android.app.Activity.RESULT_OK
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import android.content.pm.ApplicationInfo
+import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricManager.Authenticators
+import androidx.core.content.ContextCompat
+import com.example.wealthtracker.ui.components.RatingPromptManager
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -98,17 +109,28 @@ class MainActivity : AppCompatActivity() {
         // Android 12+ system splash
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        // Initialize Google Mobile Ads SDK
-        MobileAds.initialize(this)
-        // Enable test ads on this device to avoid policy violations during development
-        val requestConfiguration = RequestConfiguration.Builder()
-            .setTestDeviceIds(listOf("FBDCD822095FC6704834758AED843A43"))
-            .build()
-        MobileAds.setRequestConfiguration(requestConfiguration)
+        // Initialize InMobi SDK only in debug builds (disable ads in release)
+        if (BuildConfig.DEBUG) {
+            val consent = JSONObject()
+            InMobiSdk.init(this, "0e5df5d4bc54481086e845d419babe7c", consent, object : SdkInitializationListener {
+                override fun onInitializationComplete(error: Error?) {
+                    if (error != null) {
+                        Log.e("InMobi", "Init failed", error)
+                    } else {
+                        Log.d("InMobi", "Init successful")
+                    }
+                }
+            })
+        }
         // Notifications permission (Android 13+)
         requestNotificationPermission()
         // Log current FCM token for testing
         logCurrentFcmToken()
+        
+        // Track app opens for rating prompt
+        RatingPromptManager.incrementAppOpenCount(this)
+        RatingPromptManager.startNewSession(this)
+        
         setContent {
             val systemDark = isSystemInDarkTheme()
             var darkMode by remember { mutableStateOf(systemDark) }
@@ -121,6 +143,10 @@ class MainActivity : AppCompatActivity() {
                 requireDeviceLock = SettingsStore.requireLockFlow(applicationContext).first()
                 useHindiNumerals = SettingsStore.hindiNumeralsFlow(applicationContext).first()
                 FormatUtils.setUseHindiNumerals(useHindiNumerals)
+                
+                // Initialize FormatUtils with user's selected currency
+                FormatUtils.init(applicationContext)
+                
                 authenticated = !requireDeviceLock
             }
             val scope = rememberCoroutineScope()
@@ -139,80 +165,72 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     var showComposeSplash by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
                     val fromNotification = intent?.getBooleanExtra("from_notification", false) == true
-                    LaunchedEffect(showComposeSplash, fromNotification) {
-                        if (!showComposeSplash) return@LaunchedEffect
-                        if (fromNotification) {
-                            // Skip splash delay when launched from a notification
-                            showComposeSplash = false
-                        } else {
-                            // Show splash for 3 seconds as requested
-                            delay(3000)
-                            showComposeSplash = false
-                        }
-                    }
+                    
                     if (showComposeSplash) {
-                        val comp by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_investment))
-                        val cfgTop = androidx.compose.ui.platform.LocalConfiguration.current
-                        val isCompact = cfgTop.screenWidthDp < 600
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            // Center content: animation + app title
-                            androidx.compose.foundation.layout.Column(
-                                modifier = Modifier.align(Alignment.Center),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                LottieAnimation(
-                                    composition = comp,
-                                    iterations = Int.MAX_VALUE,
-                                    isPlaying = true,
-                                    modifier = Modifier.fillMaxSize(if (isCompact) 0.28f else 0.35f)
-                                )
-                                if (comp != null) {
-                                    // Force Montserrat explicitly on splash texts
-                                    val montserrat = FontFamily(
-                                        Font(com.ss.wealthtracker.R.font.montserrat_regular, weight = FontWeight.Normal),
-                                        Font(com.ss.wealthtracker.R.font.montserrat_semibold, weight = FontWeight.SemiBold),
-                                        Font(com.ss.wealthtracker.R.font.montserrat_bold, weight = FontWeight.Bold)
-                                    )
-                                    androidx.compose.material3.Text(
-                                        text = "TrackKaro",
-                                        color = MaterialTheme.colorScheme.primary,
-                                        style = (
-                                            if (isCompact) androidx.compose.material3.MaterialTheme.typography.headlineLarge
-                                            else androidx.compose.material3.MaterialTheme.typography.displaySmall
-                                        ).copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontFamily = montserrat)
-                                    )
-                                    androidx.compose.material3.Text(
-                                        text = "Nivesh Track Karo",
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
-                                        style = (
-                                            if (isCompact) androidx.compose.material3.MaterialTheme.typography.titleSmall
-                                            else androidx.compose.material3.MaterialTheme.typography.titleMedium
-                                        ).copy(fontFamily = montserrat)
-                                    )
-                                }
+                        ModernSplashScreen(
+                            onSplashComplete = {
+                                showComposeSplash = false
                             }
-                            // Bottom privacy/offline line (show when composition is ready)
-                            if (comp != null) {
-                                androidx.compose.material3.Text(
-                                    text = "Private • Offline • No cloud sync",
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-                                    style = (
-                                        if (isCompact) androidx.compose.material3.MaterialTheme.typography.bodyMedium
-                                        else androidx.compose.material3.MaterialTheme.typography.titleMedium
-                                    ).copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 24.dp)
-                                )
-                            }
-                        }
+                        )
                     } else {
                         val nav = rememberNavController()
                         // Create Hilt VM outside any localized provider to keep Activity context intact
                         val vm: InvestmentViewModel = hiltViewModel()
-                        val startRoute = rememberStartRoute(fromNotification, vm)
+                        
+                        // Check if onboarding is completed and country is set
+                        val userPrefs = remember { UserPreferences(this@MainActivity) }
+                        val isOnboardingCompleted = OnboardingPrefs.isCompleted(this@MainActivity)
+                        val isCountrySet = userPrefs.isCountrySet()
+                        
+                        val startRoute = if (!isOnboardingCompleted) {
+                            "onboarding"
+                        } else if (!isCountrySet) {
+                            "countrySelection"
+                        } else {
+                            rememberStartRoute(fromNotification, vm)
+                        }
+                        
                         if (startRoute != null) {
                             NavHost(navController = nav, startDestination = startRoute) {
+                                // Onboarding screen
+                                composable("onboarding") {
+                                    OnboardingScreen(
+                                        onComplete = {
+                                            OnboardingPrefs.setCompleted(this@MainActivity, true)
+                                            // After onboarding, go to country selection
+                                            nav.navigate("countrySelection") {
+                                                popUpTo("onboarding") { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
+                                
+                                // Country Selection screen
+                                composable("countrySelection") {
+                                    CountrySelectionScreen(
+                                        onCountrySelected = { country ->
+                                            // Save country selection
+                                            userPrefs.setCountry(
+                                                countryCode = country.countryCode,
+                                                countryName = country.countryName,
+                                                currencyCode = country.currencyCode,
+                                                currencySymbol = country.currencySymbol
+                                            )
+                                            
+                                            // Update FormatUtils with selected currency
+                                            FormatUtils.setCurrency(
+                                                symbol = country.currencySymbol,
+                                                code = country.currencyCode,
+                                                country = country.countryCode
+                                            )
+                                            
+                                            // Navigate to dashboard
+                                            nav.navigate("dashboard") {
+                                                popUpTo("countrySelection") { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
                                 composable(
                                     "dashboard",
                                     enterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
@@ -226,7 +244,8 @@ class MainActivity : AppCompatActivity() {
                                             onAddClick = { nav.navigate("invest") },
                                             onOpenInvestments = { nav.navigate("invest") },
                                             onOpenCalculators = { nav.navigate("calculators?tab=fd") },
-                                            onOpenSettings = { nav.navigate("settings") }
+                                            onOpenSettings = { nav.navigate("settings") },
+                                            onOpenReminders = { nav.navigate("reminders") }
                                         )
                                     }
                                 }
@@ -332,6 +351,43 @@ class MainActivity : AppCompatActivity() {
                                             scope.launch { com.example.wealthtracker.data.SettingsStore.setHindiNumerals(applicationContext, useHindiNumerals) }
                                             pendingLocaleTag = if (useHindiNumerals) "hi-IN" else "en-IN"
                                         },
+                                        onBack = { nav.popBackStack() },
+                                        onOpenReferral = { nav.navigate("referral") }
+                                    )
+                                }
+                                composable(
+                                    "referral",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
+                                    ReferralScreen(
+                                        onBack = { nav.popBackStack() }
+                                    )
+                                }
+                                composable(
+                                    "reminders",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
+                                    val ctx = LocalContext.current
+                                    val reminderManager = remember { com.example.wealthtracker.data.ReminderManager.getInstance(ctx) }
+                                    
+                                    val activeReminders by reminderManager.activeReminders.collectAsState()
+                                    val snoozedReminders by reminderManager.snoozedReminders.collectAsState()
+                                    val dismissedReminders by reminderManager.dismissedReminders.collectAsState()
+                                    
+                                    com.example.wealthtracker.ui.screens.RemindersScreen(
+                                        activeReminders = activeReminders,
+                                        snoozedReminders = snoozedReminders,
+                                        dismissedReminders = dismissedReminders,
+                                        onGotIt = { reminderManager.dismissReminder(it.id) },
+                                        onRemindLater = { reminderManager.snoozeReminder(it.id) },
+                                        onDismiss = { reminderManager.archiveReminder(it.id) },
+                                        onReactivate = { reminderManager.reactivateReminder(it.id) },
                                         onBack = { nav.popBackStack() }
                                     )
                                 }
@@ -339,15 +395,33 @@ class MainActivity : AppCompatActivity() {
                             }
                             // App lock overlay when required and not authenticated: system device credential
                             if (requireDeviceLock && !authenticated) {
-                                // Launcher for Keyguard confirm intent
-                                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                                    if (result.resultCode == RESULT_OK) authenticated = true
+                                val ctx = androidx.compose.ui.platform.LocalContext.current
+                                val activity = remember(ctx) { ctx as? androidx.appcompat.app.AppCompatActivity }
+                                val executor = remember(activity) { activity?.let { ContextCompat.getMainExecutor(it) } }
+                                val prompt = remember(activity, executor) {
+                                    activity?.let {
+                                        BiometricPrompt(
+                                            it,
+                                            executor!!,
+                                            object : BiometricPrompt.AuthenticationCallback() {
+                                                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                                    authenticated = true
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                val promptInfo = remember {
+                                    BiometricPrompt.PromptInfo.Builder()
+                                        .setTitle("Unlock")
+                                        .setSubtitle("Confirm device lock to continue")
+                                        .setAllowedAuthenticators(Authenticators.DEVICE_CREDENTIAL)
+                                        .build()
                                 }
                                 val km = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
                                 LaunchedEffect(Unit) {
                                     if (km.isDeviceSecure) {
-                                        val intent = km.createConfirmDeviceCredentialIntent("Unlock", "Confirm device lock to continue")
-                                        if (intent != null) launcher.launch(intent)
+                                        prompt?.authenticate(promptInfo)
                                     }
                                 }
                                 Box(Modifier.fillMaxSize()) {
@@ -373,8 +447,7 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         } else {
                                             androidx.compose.material3.Button(onClick = {
-                                                val intent = km.createConfirmDeviceCredentialIntent("Unlock", "Confirm device lock to continue")
-                                                if (intent != null) launcher.launch(intent)
+                                                prompt?.authenticate(promptInfo)
                                             }) {
                                                 Text("Unlock")
                                             }

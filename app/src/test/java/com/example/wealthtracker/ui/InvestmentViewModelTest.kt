@@ -6,7 +6,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.test.resetMain
@@ -64,7 +66,7 @@ private class FakeRepo : InvestmentRepository {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InvestmentViewModelTest {
-    private val testDispatcher = StandardTestDispatcher()
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun setup() {
@@ -88,6 +90,8 @@ class InvestmentViewModelTest {
     fun filtering_respects_type_and_sorting() = runTest {
         val repo = FakeRepo()
         val vm = InvestmentViewModel(repo)
+        // Start collecting to activate stateIn lazy upstreams
+        val collectJob = launch { vm.filteredInvestments.collect { /* no-op */ } }
         // Seed: three items; createdAt auto (now), so inject with explicit times via update after add
         repo.addInvestment("Fixed Deposit", 1000.0, "FD", "HDFC")
         repo.addInvestment("Gold", 500.0, "Gold", null)
@@ -109,22 +113,26 @@ class InvestmentViewModelTest {
         vm.setTypeFilter(null)
         advanceUntilIdle()
         assertEquals(3, vm.filteredInvestments.value.size)
+        collectJob.cancel()
     }
 
     @Test
     fun add_validation_gates() = runTest {
         val repo = FakeRepo()
         val vm = InvestmentViewModel(repo)
+        // Start collecting to activate stateIn lazy upstreams
+        val collectJob = launch { vm.filteredInvestments.collect { /* no-op */ } }
 
         // Invalid amount
+        val sizeBefore = vm.investments.value.size
         vm.addInvestment("0", "Gold", null)
         advanceUntilIdle()
-        assertTrue(vm.investments.value.isEmpty())
+        assertEquals(sizeBefore, vm.investments.value.size)
 
         // FD without bank
         vm.addInvestment("1000", "FD", null)
         advanceUntilIdle()
-        assertTrue(vm.investments.value.isEmpty())
+        assertEquals(sizeBefore, vm.investments.value.size)
 
         // Valid Gold
         vm.addInvestment("500", "Gold", null)
@@ -134,12 +142,13 @@ class InvestmentViewModelTest {
 
         // Valid FD
         vm.addInvestment("1500", "FD", "SBI")
-        delay(50)
-        assertEquals(1, vm.investments.value.size)
+        advanceUntilIdle()
+        assertEquals(2, vm.investments.value.size)
 
         // Valid Others with name
         vm.addInvestment("2000", "Others", null, displayName = "US Stocks")
-        delay(50)
-        assertEquals(2, vm.investments.value.size)
+        advanceUntilIdle()
+        assertEquals(3, vm.investments.value.size)
+        collectJob.cancel()
     }
 }

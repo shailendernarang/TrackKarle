@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.AnimatedVisibility
@@ -45,10 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.util.Log
 import com.example.wealthtracker.network.StocksApiProvider
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.LoadAdError
+import com.inmobi.ads.InMobiBanner
+import com.inmobi.ads.AdMetaInfo
+import com.inmobi.ads.listeners.BannerAdEventListener
+import com.ss.wealthtracker.BuildConfig
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
@@ -349,19 +350,44 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
 
             // Marquee removed
 
-            // Search + suggestions
-            SearchSection(
-                query = query,
-                onQueryChange = { query = it },
-                suggestions = suggestions,
-                onItemClick = { s ->
-                    selectedName = s.name
-                    search(s.symbol)
-                },
-                onSearch = { search(query.trim()) },
-                onClear = { query = "" },
-                recent = recent
-            )
+            // Search + suggestions (hide when stock is selected)
+            if (selectedSymbol.isNullOrBlank()) {
+                SearchSection(
+                    query = query,
+                    onQueryChange = { query = it },
+                    suggestions = suggestions,
+                    onItemClick = { s ->
+                        selectedSymbol = s.symbol
+                        selectedName = s.name
+                        suggestions = emptyList() // Clear suggestions after selection
+                        query = "" // Clear search query
+                        search(s.symbol)
+                    },
+                    onSearch = { search(query.trim()) },
+                    onClear = { query = "" },
+                    recent = recent
+                )
+            } else {
+                // Show selected stock chip with clear option
+                FilterChip(
+                    selected = true,
+                    onClick = {
+                        selectedSymbol = null
+                        selectedName = null
+                        chartPoints = emptyList()
+                        relatedNews = emptyList()
+                        relatedNewsMc = emptyList()
+                    },
+                    label = { Text("$selectedName ($selectedSymbol)") },
+                    trailingIcon = {
+                        Icon(Icons.Default.Close, "Clear selection", modifier = Modifier.size(18.dp))
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
 
             if (isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -411,34 +437,35 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
 
             // News blocks
             NewsSection("Market News", marketNews)
-            // AdMob banner between Market News and Top 10 Stocks; render only when loaded
-            run {
+            if (BuildConfig.DEBUG) {
                 val ctx = androidx.compose.ui.platform.LocalContext.current
                 var adLoaded by remember { mutableStateOf(false) }
-                val adView = remember(ctx) {
-                    com.google.android.gms.ads.AdView(ctx).apply {
-                        adUnitId = "ca-app-pub-4934815537317220/1418248826"
-                    }
-                }
+                val banner = remember(ctx) { InMobiBanner(ctx, 10000535531L) }
                 DisposableEffect(Unit) {
-                    val dm = ctx.resources.displayMetrics
-                    val adWidthDp = (dm.widthPixels / dm.density).toInt()
-                    val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
-                    adView.setAdSize(adaptiveSize)
-                    adView.adListener = object : AdListener() {
-                        override fun onAdLoaded() { adLoaded = true }
-                        override fun onAdFailedToLoad(error: LoadAdError) { 
-                            adLoaded = false
-                            android.util.Log.e("StockAnalysisAd", "Ad failed: ${error.message} (${error.code})")
+                    banner.setBannerSize(320, 50)
+                    banner.setListener(object : BannerAdEventListener() {
+                        override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
+                            adLoaded = true
                         }
-                    }
-                    adView.loadAd(AdRequest.Builder().build())
-                    onDispose {
-                        adView.destroy()
-                    }
+
+                        override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
+                            adLoaded = false
+                            android.util.Log.e(
+                                "StockAnalysisAd",
+                                "InMobi banner failed: message=${status.message}, raw=$status"
+                            )
+                        }
+                    })
+                    banner.load()
+                    onDispose { banner.destroy() }
                 }
                 if (adLoaded) {
-                    AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
+                    AndroidView(
+                        factory = { banner },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    )
                 }
             }
             NewsSection("Top 10 Stocks - News", top10News)
@@ -450,16 +477,34 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
 
 @Composable
 private fun NewsSection(title: String, items: List<NewsItem>) {
-    Text(title, style = MaterialTheme.typography.titleMedium)
-    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-    AnimatedVisibility(
-        visible = items.isNotEmpty(),
-        enter = fadeIn() + expandVertically(),
-        exit = shrinkVertically() + fadeOut()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        NewsGrid(items.take(12))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "${items.size} articles",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            NewsListAll(items.take(8))
+        }
     }
-    Spacer(Modifier.height(12.dp))
 }
 
 @Composable
@@ -469,23 +514,49 @@ private fun NewsListAll(items: List<NewsItem>) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(max = 480.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         items(items, key = { it.link }) { n ->
-            ListItem(
-                headlineContent = { Text(n.title) },
-                supportingContent = {
-                    Text(n.source, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(n.link))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        ctx.startActivity(intent)
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(n.link))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    ctx.startActivity(intent)
+                }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        n.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            n.source,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-            )
-            HorizontalDivider()
+                }
+            }
         }
     }
 }
@@ -538,8 +609,15 @@ fun SearchSection(
                 ) {
                     items(suggestions, key = { it.symbol }) { s ->
                         ListItem(
-                            headlineContent = { Text(s.name) },
-                            supportingContent = { Text(s.symbol) },
+                            headlineContent = { Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            supportingContent = { Text(s.symbol, style = MaterialTheme.typography.bodySmall) },
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
