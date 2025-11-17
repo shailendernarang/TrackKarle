@@ -134,6 +134,8 @@ dependencies {
     // Retrofit for API calls
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    // Pin Gson to a safe version (addresses CVE for <2.8.9)
+    implementation 'com.google.code.gson:gson:2.11.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     
     // Coil for image loading
@@ -146,8 +148,8 @@ dependencies {
     // InMobi Ads SDK (Kotlin)
     implementation 'com.inmobi.monetization:inmobi-ads-kotlin:11.1.0'
 
-    // Firebase Cloud Messaging
-    implementation platform('com.google.firebase:firebase-bom:33.4.0')
+    // Firebase (BOM pinned to latest stable to pick security fixes)
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
     implementation 'com.google.firebase:firebase-messaging-ktx'
     implementation 'com.google.firebase:firebase-crashlytics-ktx'
     implementation 'com.google.firebase:firebase-analytics-ktx'
