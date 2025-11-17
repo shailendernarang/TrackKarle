@@ -31,6 +31,7 @@ import com.ss.wealthtracker.R
 import android.content.Intent
 import android.net.Uri
 import com.ss.wealthtracker.BuildConfig
+import com.example.wealthtracker.util.BiometricUtils
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +57,8 @@ fun SettingsScreen(
         }
     ) { inner ->
         val ctx = LocalContext.current
+        val isDeviceLockAvailable = BiometricUtils.isDeviceLockAvailable(ctx)
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -69,12 +72,16 @@ fun SettingsScreen(
                 onToggle = onToggleDarkMode
             )
             HorizontalDivider()
-            SettingRow(
-                title = if (requireDeviceLock) stringResource(id = R.string.require_device_lock_on) else stringResource(id = R.string.require_device_lock_off),
-                checked = requireDeviceLock,
-                onToggle = onToggleRequireDeviceLock
-            )
-            HorizontalDivider()
+            
+            // Only show device lock option if it's available on this device
+            if (isDeviceLockAvailable) {
+                SettingRow(
+                    title = if (requireDeviceLock) stringResource(id = R.string.require_device_lock_on) else stringResource(id = R.string.require_device_lock_off),
+                    checked = requireDeviceLock,
+                    onToggle = onToggleRequireDeviceLock
+                )
+                HorizontalDivider()
+            }
             SettingRow(
                 title = stringResource(id = R.string.change_language_hindi),
                 checked = useHindiNumerals,

@@ -74,40 +74,116 @@ object AppModule {
 
         // Log backend selection (encrypted/plain)
         Log.d("DB", "backend=${if (factory != null) "encrypted" else "plain"}")
+        
+        // Track database backend analytics (always plain for playRelease)
+        val analyticsManager = com.example.wealthtracker.analytics.AnalyticsManager(context)
+        analyticsManager.logDatabaseBackend(
+            backend = "plain",
+            encrypted = false
+        )
+        
+        // BULLETPROOF DATABASE PROTECTION
+        runCatching {
+            // 1. Lightweight validation (file system only)
+            val dbPath = context.getDatabasePath(if (factory != null) "wealth_tracker_encrypted.db" else "wealth_tracker.db")
+            val exists = dbPath.exists()
+            val size = if (exists) dbPath.length() else 0
+            Log.d("DB", "validation: exists=$exists, size=${size}bytes")
+            
+            // 2. Create safety backup if database exists and has data
+            if (exists && size > 0) {
+                val safetyGuard = com.example.wealthtracker.util.DatabaseSafetyGuard(context)
+                Thread {
+                    runCatching {
+                        safetyGuard.createSafetyBackup("app_startup")
+                    }.onFailure { e ->
+                        Log.w("DB", "Safety backup failed (non-critical)", e)
+                    }
+                }.start()
+            }
+        }.onFailure { e ->
+            Log.e("DB", "validation_failed", e)
+        }
 
-        // One-time offline migration from old plain DB to new encrypted DB (secure flavor only)
-        if (factory != null) {
+        // Skip migration logic for playRelease (always uses plain DB)
+        if (false) { // Disabled - only needed for secure flavor
             val migPrefs = context.getSharedPreferences("db_migration_flags", Context.MODE_PRIVATE)
             val alreadyMigrated = migPrefs.getBoolean("migrated_to_encrypted", false)
             if (!alreadyMigrated) {
                 val oldMain = context.getDatabasePath("wealth_tracker.db")
-                if (oldMain.exists()) {
+                if (oldMain.exists() && oldMain.length() > 0) {
+                    // CRITICAL MIGRATION - BULLETPROOF PROTECTION
+                    val safetyGuard = com.example.wealthtracker.util.DatabaseSafetyGuard(context)
+                    
                     runBlocking {
-                        // Open old DB without encryption and copy rows into encrypted DB
-                        val oldDb = Room.databaseBuilder(context, WealthTrackerDatabase::class.java, "wealth_tracker.db")
-                            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                            .build()
-                        var copied = false
-                        try {
-                            val oldDao = oldDb.investmentDao()
-                            val rows = runCatching { oldDao.getAllOnce() }.getOrDefault(emptyList())
-                            if (rows.isNotEmpty()) {
-                                val newDao = db.investmentDao()
-                                rows.forEach { newDao.insert(it.copy(id = 0)) }
-                                // Log migration copy count
-                                Log.d("DB", "db_migration_copied rows=${rows.size}")
-                                copied = true
-                            }
-                        } finally {
-                            oldDb.close()
-                            // Remove old unencrypted DB files only if we copied rows
-                            if (copied) {
-                                listOf("wealth_tracker.db", "wealth_tracker.db-shm", "wealth_tracker.db-wal").forEach { name ->
-                                    kotlin.runCatching { context.getDatabasePath(name).delete() }
+                        // STEP 1: Create safety backup before touching ANYTHING
+                        val backupSuccess = safetyGuard.createSafetyBackup("critical_migration_plain_to_encrypted")
+                        if (!backupSuccess) {
+                            Log.e("DB", "CRITICAL: Cannot proceed with migration - backup failed")
+                            return@runBlocking
+                        }
+                        
+                        // STEP 2: Safe migration with multiple protections
+                        safetyGuard.safeOperation("migration_plain_to_encrypted", createBackup = false) {
+                            val oldDb = Room.databaseBuilder(context, WealthTrackerDatabase::class.java, "wealth_tracker.db")
+                                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                                .build()
+                            var copied = false
+                            try {
+                                // Verify old database health before migration
+                                val healthStatus = safetyGuard.verifyDatabaseHealth(oldDb)
+                                if (healthStatus != com.example.wealthtracker.util.DatabaseHealthStatus.HEALTHY) {
+                                    Log.w("DB", "Old database health: $healthStatus - proceeding with caution")
                                 }
-                                Log.d("DB", "db_migration_cleanup deleted old plain DB files")
-                            } else {
-                                Log.d("DB", "db_migration_noop: no rows to copy; leaving old plain DB files intact")
+                                
+                                val oldDao = oldDb.investmentDao()
+                                val rows = runCatching { runBlocking { oldDao.getAllOnce() } }.getOrDefault(emptyList())
+                                
+                                if (rows.isNotEmpty()) {
+                                    Log.i("DB", "MIGRATION: Starting copy of ${rows.size} records")
+                                    val newDao = db.investmentDao()
+                                    
+                                    // Copy records one by one with error handling
+                                    var successCount = 0
+                                    rows.forEach { row ->
+                                        runCatching {
+                                            runBlocking { newDao.insert(row.copy(id = 0)) }
+                                            successCount++
+                                        }.onFailure { e ->
+                                            Log.e("DB", "Failed to copy record: ${row.id}", e)
+                                        }
+                                    }
+                                    
+                                    Log.i("DB", "MIGRATION: Successfully copied $successCount/${rows.size} records")
+                                    copied = (successCount > 0)
+                                    
+                                    // Track migration analytics
+                                    analyticsManager.logDatabaseMigration(
+                                        fromVersion = 0, // Plain DB
+                                        toVersion = 3,   // Encrypted DB v3
+                                        success = copied,
+                                        recordCount = successCount
+                                    )
+                                } else {
+                                    Log.i("DB", "MIGRATION: No records to copy")
+                                }
+                            } finally {
+                                oldDb.close()
+                                
+                                // STEP 3: Only delete old files if migration was successful
+                                if (copied) {
+                                    Log.i("DB", "MIGRATION: Cleaning up old database files")
+                                    listOf("wealth_tracker.db", "wealth_tracker.db-shm", "wealth_tracker.db-wal").forEach { name ->
+                                        runCatching { 
+                                            val deleted = context.getDatabasePath(name).delete()
+                                            Log.d("DB", "Deleted $name: $deleted")
+                                        }.onFailure { e ->
+                                            Log.w("DB", "Failed to delete $name", e)
+                                        }
+                                    }
+                                } else {
+                                    Log.w("DB", "MIGRATION: Keeping old database files due to copy issues")
+                                }
                             }
                         }
                     }

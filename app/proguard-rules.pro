@@ -114,6 +114,47 @@
 -dontwarn com.google.firebase.**
 
 ###############################
+# Firebase Performance        #
+###############################
+# Keep Firebase Performance protobuf classes
+-keep class com.google.firebase.perf.** { *; }
+-keep class com.google.android.datatransport.** { *; }
+-dontwarn com.google.firebase.perf.**
+-dontwarn com.google.android.datatransport.**
+
+# Keep protobuf classes used by Firebase Performance
+-keep class com.google.protobuf.** { *; }
+-dontwarn com.google.protobuf.**
+-keepclassmembers class com.google.protobuf.** {
+    <fields>;
+    <methods>;
+}
+
+# Prevent aggressive optimization of protobuf serialization
+-keepclassmembers class com.google.protobuf.FieldSet {
+    *** computeElementSizeNoTag(...);
+    *** computeElementSize(...);
+}
+-keepclassmembers class com.google.protobuf.MapEntryLite {
+    *** computeSerializedSize(...);
+    *** computeMessageSize(...);
+}
+-keepclassmembers class com.google.protobuf.MapFieldSchemaLite {
+    *** getSerializedSizeLite(...);
+    *** getSerializedSize(...);
+}
+-keepclassmembers class com.google.protobuf.MessageSchema {
+    *** getSerializedSizeProto2(...);
+    *** getSerializedSize(...);
+}
+
+# Keep Firebase Performance transport classes
+-keep class com.google.firebase.perf.transport.** { *; }
+-keepclassmembers class com.google.firebase.perf.transport.** {
+    <methods>;
+}
+
+###############################
 # InMobi Ads SDK              #
 ###############################
 -keep class com.inmobi.** { *; }
@@ -315,3 +356,174 @@
 # Preserve and KEEP all native methods so RegisterNatives can find them
 -keepclasseswithmembers class * { native <methods>; }
 -keepclasseswithmembers class net.sqlcipher.** { native <methods>; }
+
+###############################
+# Database Safety Features    #
+###############################
+# Keep all database safety and integrity classes
+-keep class com.example.wealthtracker.util.DatabaseSafetyGuard { *; }
+-keep class com.example.wealthtracker.util.DatabaseIntegrityChecker { *; }
+-keep class com.example.wealthtracker.util.DatabaseIntegrityChecker$* { *; }
+
+# Keep all data classes and enums used by safety features
+-keep class com.example.wealthtracker.util.DatabaseHealthStatus { *; }
+-keep class com.example.wealthtracker.util.SafeOperationResult { *; }
+-keep class com.example.wealthtracker.util.SafeOperationResult$* { *; }
+-keep class com.example.wealthtracker.util.RecoveryResult { *; }
+-keep class com.example.wealthtracker.util.DatabaseSafetyStatus { *; }
+
+# Keep all methods in safety classes (they use reflection and file operations)
+-keepclassmembers class com.example.wealthtracker.util.DatabaseSafetyGuard {
+    public <methods>;
+    private <methods>;
+}
+-keepclassmembers class com.example.wealthtracker.util.DatabaseIntegrityChecker {
+    public <methods>;
+    private <methods>;
+}
+
+# Keep companion object constants (used by inline functions)
+-keepclassmembers class com.example.wealthtracker.util.DatabaseSafetyGuard$Companion {
+    public static final java.lang.String TAG;
+    public static final java.lang.String BACKUP_DIR;
+    public static final int MAX_BACKUPS;
+}
+
+# Keep enum values and methods (used in switch statements)
+-keepclassmembers enum com.example.wealthtracker.util.DatabaseHealthStatus {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+-keepclassmembers enum com.example.wealthtracker.util.RecoveryResult {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# Keep data class constructors and fields (used for serialization/logging)
+-keepclassmembers class com.example.wealthtracker.util.DatabaseIntegrityChecker$IntegrityReport {
+    <init>(...);
+    <fields>;
+    public <methods>;
+}
+-keepclassmembers class com.example.wealthtracker.util.DatabaseSafetyStatus {
+    <init>(...);
+    <fields>;
+    public <methods>;
+}
+
+# Keep sealed class hierarchies for SafeOperationResult
+-keep class com.example.wealthtracker.util.SafeOperationResult$Success { *; }
+-keep class com.example.wealthtracker.util.SafeOperationResult$Failure { *; }
+-keepclassmembers class com.example.wealthtracker.util.SafeOperationResult$Success {
+    <init>(...);
+    <fields>;
+    public <methods>;
+}
+-keepclassmembers class com.example.wealthtracker.util.SafeOperationResult$Failure {
+    <init>(...);
+    <fields>;
+    public <methods>;
+}
+
+# Keep File I/O operations (backup creation uses file system operations)
+-keep class java.io.File { *; }
+-keepclassmembers class java.io.File {
+    public <methods>;
+}
+
+# Keep Thread operations (background integrity checks use threads)
+-keep class java.lang.Thread { *; }
+-keepclassmembers class java.lang.Thread {
+    public <methods>;
+}
+
+# Keep coroutines timeout operations
+-keep class kotlinx.coroutines.TimeoutCancellationException { *; }
+-keep class kotlinx.coroutines.withTimeout { *; }
+
+# Prevent aggressive optimization of database safety logic
+-keepclassmembers class com.example.wealthtracker.util.DatabaseSafetyGuard {
+    *** createSafetyBackup(...);
+    *** safeOperation(...);
+    *** emergencyRecovery(...);
+    *** verifyDatabaseHealth(...);
+}
+-keepclassmembers class com.example.wealthtracker.util.DatabaseIntegrityChecker {
+    *** checkIntegrity(...);
+    *** checkIntegrityWithTimeout(...);
+    *** checkIntegrityInBackground(...);
+    *** isHealthy(...);
+}
+
+# Keep updated DAO methods for database safety
+-keepclassmembers class com.example.wealthtracker.data.local.InvestmentDao {
+    *** getInvestmentCount(...);
+    *** getValidInvestmentCount(...);
+    *** getLatestInvestmentId(...);
+}
+
+# Keep analytics methods for database monitoring
+-keepclassmembers class com.example.wealthtracker.analytics.AnalyticsManager {
+    *** logDatabaseMigration(...);
+    *** logDatabaseIntegrityCheck(...);
+    *** logDatabaseBackend(...);
+}
+
+# Keep Firebase Analytics Bundle class (used for event parameters)
+-keep class android.os.Bundle { *; }
+-keepclassmembers class android.os.Bundle {
+    public <methods>;
+}
+
+# Keep database migration classes and methods (needed for Room)
+-keep class com.example.wealthtracker.data.local.WealthTrackerDatabaseKt { *; }
+-keepclassmembers class com.example.wealthtracker.data.local.WealthTrackerDatabaseKt {
+    *** MIGRATION_1_2;
+    *** MIGRATION_2_3;
+}
+-keepclassmembers class androidx.room.migration.Migration {
+    public <methods>;
+}
+
+# Keep database path methods (used for backup creation)
+-keepclassmembers class android.content.Context {
+    *** getDatabasePath(...);
+    *** getFilesDir(...);
+}
+
+# Keep SharedPreferences (used for migration flags)
+-keep class android.content.SharedPreferences { *; }
+-keep class android.content.SharedPreferences$Editor { *; }
+-keepclassmembers class android.content.SharedPreferences {
+    public <methods>;
+}
+-keepclassmembers class android.content.SharedPreferences$Editor {
+    public <methods>;
+}
+
+# Additional R8 optimizations for database safety
+-keepclassmembers class com.example.wealthtracker.util.** {
+    !synthetic <methods>;
+}
+
+# Prevent R8 from optimizing away backup file operations
+-keepclassmembers class java.io.File {
+    *** copyTo(...);
+    *** exists(...);
+    *** length(...);
+    *** delete(...);
+    *** mkdirs(...);
+    *** listFiles(...);
+    *** lastModified(...);
+}
+
+# Keep Hilt injection for safety classes
+-keep @dagger.hilt.android.scopes.Singleton class com.example.wealthtracker.util.DatabaseSafetyGuard
+-keep @javax.inject.Singleton class com.example.wealthtracker.util.DatabaseIntegrityChecker
+
+# Prevent inlining of critical safety methods
+-keepclassmembers class com.example.wealthtracker.util.DatabaseSafetyGuard {
+    !synthetic *** createSafetyBackup(...);
+    !synthetic *** safeOperation(...);
+    !synthetic *** emergencyRecovery(...);
+}

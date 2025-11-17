@@ -30,17 +30,16 @@ class InvestmentViewModel @Inject constructor(
     // Filters
     private val _typeFilter = MutableStateFlow<String?>(null)
     val typeFilter: StateFlow<String?> = _typeFilter
-    val filteredInvestments: StateFlow<List<InvestmentEntity>> =
-        combine(investments, _typeFilter) { list, filter ->
-            val sorted = list.sortedByDescending { it.createdAt }
-            val f = when (filter) { "Equity" -> "Stocks"; else -> filter }
-            if (f.isNullOrBlank() || f == "All") sorted else {
-                sorted.filter {
-                    val t = if (it.investmentType == "Equity") "Stocks" else it.investmentType
-                    t == f
-                }
+    val filteredInvestments: StateFlow<List<InvestmentEntity>> = combine(investments, _typeFilter) { list, filter ->
+        val sorted = list.sortedByDescending { it.createdAt }
+        val f = when (filter) { "Equity" -> "Stocks"; else -> filter }
+        if (f.isNullOrBlank() || f == "All") sorted else {
+            sorted.filter {
+                val t = if (it.investmentType == "Equity") "Stocks" else it.investmentType
+                t == f
             }
-        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val totalCount: StateFlow<Int> = investments.map { it.size }
         .stateIn(viewModelScope, SharingStarted.Lazily, 0)

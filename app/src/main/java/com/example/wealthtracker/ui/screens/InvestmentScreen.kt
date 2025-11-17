@@ -270,32 +270,49 @@ private fun ChartSection(
             } else {
                 // Resolve dynamic text colors based on theme
                 val onSurface = MaterialTheme.colorScheme.onSurface.toArgb()
-                val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
                 var animateOnce by remember(items, filter, vizType) { mutableStateOf(true) }
-                AndroidView(
-                factory = { context ->
-                    if (vizType == "Pie") {
-                        com.example.wealthtracker.ui.charts.ChartUtils.createPieChart(context, onSurface)
-                    } else {
-                        com.example.wealthtracker.ui.charts.ChartUtils.createBarChart(context, onSurface)
+                if (vizType == "Pie") {
+                    // Use new safe Compose pie chart instead of problematic MPAndroidChart
+                    val composeColors = colors.map { Color(it) }
+                    val centerText = when (filter) {
+                        "FD" -> "Fixed\nDeposits"
+                        "Stocks" -> "Stock\nPortfolio"
+                        "Mutual Fund" -> "Mutual\nFunds"
+                        else -> "Total\nInvestments"
                     }
-                },
-                update = { view ->
-                    if (view is com.github.mikephil.charting.charts.PieChart) {
-                        com.example.wealthtracker.ui.charts.ChartUtils.bindPieData(view, data, colors, animateOnce)
-                    } else if (view is com.github.mikephil.charting.charts.BarChart) {
-                        val labels = data.map { it.first }
-                        val values = data.map { it.second.toFloat() }
-                        com.example.wealthtracker.ui.charts.ChartUtils.bindBarData(view, labels, values, colors, onSurface, animateOnce)
-                        view.xAxis.setLabelCount(labels.size, false)
-                        view.setVisibleXRangeMaximum(6f)
-                    }
-                    if (animateOnce) animateOnce = false
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                )
+                    
+                    com.example.wealthtracker.ui.charts.SafePieChart(
+                        data = data,
+                        colors = composeColors,
+                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        showLegend = false, // Legend shown separately below
+                        animationEnabled = animateOnce,
+                        centerText = centerText,
+                        onSliceClick = null  // Disable tap to avoid interfering with scroll
+                    )
+                } else {
+                    AndroidView(
+                        factory = { context ->
+                            com.example.wealthtracker.ui.charts.ChartUtils.createBarChart(context, onSurface)
+                        },
+                        update = { view ->
+                            val labels = data.map { it.first }
+                            val values = data.map { it.second.toFloat() }
+                            com.example.wealthtracker.ui.charts.ChartUtils.bindBarData(view, labels, values, colors, onSurface, animateOnce)
+                            view.xAxis.setLabelCount(labels.size, false)
+                            view.setVisibleXRangeMaximum(6f)
+                            if (animateOnce) animateOnce = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                    )
+                }
+                
+                // Reset animation flag
+                LaunchedEffect(items, filter, vizType) {
+                    animateOnce = false
+                }
             }
             Spacer(Modifier.height(8.dp))
             Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {

@@ -47,58 +47,8 @@ object ModernChartUtils {
         }
     }
     
-    @Composable
-    fun EnhancedPieChart(
-        data: List<Pair<String, Double>>,
-        modifier: Modifier = Modifier,
-        showLegend: Boolean = true,
-        showValues: Boolean = true,
-        animationEnabled: Boolean = true
-    ) {
-        val colors = getDarkModeAwareColors()
-        
-        Row(modifier = modifier) {
-            // Use existing MPAndroidChart for now
-            androidx.compose.ui.viewinterop.AndroidView(
-                factory = { context ->
-                    com.github.mikephil.charting.charts.PieChart(context).apply {
-                        description.isEnabled = false
-                        legend.isEnabled = false
-                        setUsePercentValues(false)
-                        setDrawEntryLabels(false)
-                        setHoleColor(android.graphics.Color.TRANSPARENT)
-                        setTouchEnabled(true)
-                        setExtraOffsets(8f, 8f, 8f, 8f)
-                    }
-                },
-                update = { chart ->
-                    val entries = data.map { (label, value) -> 
-                        com.github.mikephil.charting.data.PieEntry(value.toFloat(), label) 
-                    }
-                    val dataSet = com.github.mikephil.charting.data.PieDataSet(entries, null).apply {
-                        this.colors = colors.map { it.toArgb() }
-                        sliceSpace = 2f
-                        selectionShift = 6f
-                    }
-                    chart.data = com.github.mikephil.charting.data.PieData(dataSet).apply { 
-                        setDrawValues(showValues) 
-                    }
-                    if (animationEnabled) chart.animateY(700)
-                    chart.invalidate()
-                },
-                modifier = Modifier.weight(1f)
-            )
-            
-            if (showLegend) {
-                Spacer(modifier = Modifier.width(16.dp))
-                PieChartLegend(
-                    data = data,
-                    colors = colors,
-                    modifier = Modifier.width(120.dp)
-                )
-            }
-        }
-    }
+    // EnhancedPieChart has been removed - use SafePieChart from ComposePieChart.kt instead
+    // This prevents any accidental usage of the old MPAndroidChart pie chart implementation
     
     @Composable
     fun EnhancedColumnChart(

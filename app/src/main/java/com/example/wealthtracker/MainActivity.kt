@@ -98,9 +98,11 @@ import android.app.Activity.RESULT_OK
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import android.content.pm.ApplicationInfo
 import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators
 import androidx.core.content.ContextCompat
 import com.example.wealthtracker.ui.components.RatingPromptManager
+import com.example.wealthtracker.util.BiometricUtils
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -415,13 +417,32 @@ class MainActivity : AppCompatActivity() {
                                     BiometricPrompt.PromptInfo.Builder()
                                         .setTitle("Unlock")
                                         .setSubtitle("Confirm device lock to continue")
-                                        .setAllowedAuthenticators(Authenticators.DEVICE_CREDENTIAL)
+                                        .setAllowedAuthenticators(BiometricUtils.getCompatibleAuthenticators())
+                                        .apply {
+                                            // For older versions, we need setNegativeButtonText when using DEVICE_CREDENTIAL
+                                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                                                setNegativeButtonText("Cancel")
+                                            }
+                                        }
                                         .build()
                                 }
                                 val km = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
                                 LaunchedEffect(Unit) {
                                     if (km.isDeviceSecure) {
-                                        prompt?.authenticate(promptInfo)
+                                        try {
+                                            // Use BiometricUtils for consistent availability checking
+                                            if (BiometricUtils.isDeviceLockReady(this@MainActivity)) {
+                                                prompt?.authenticate(promptInfo)
+                                            } else {
+                                                // Device lock not ready, skip authentication
+                                                Log.w("BiometricAuth", "Device lock not ready: ${BiometricUtils.getDeviceLockStatusMessage(this@MainActivity)}")
+                                                authenticated = true
+                                            }
+                                        } catch (e: Exception) {
+                                            // Fallback: Skip biometric auth if it fails
+                                            Log.e("BiometricAuth", "Biometric authentication failed", e)
+                                            authenticated = true
+                                        }
                                     }
                                 }
                                 Box(Modifier.fillMaxSize()) {

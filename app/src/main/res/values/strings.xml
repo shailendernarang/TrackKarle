@@ -5,6 +5,8 @@
     <string name="share_pdf">Share PDF</string>
     <string name="require_device_lock_on">Require device lock: On</string>
     <string name="require_device_lock_off">Require device lock: Off</string>
+    <string name="hindi_numerals_on">Hindi numerals: On</string>
+    <string name="hindi_numerals_off">Hindi numerals: Off</string>
     <string name="toggle_dark_mode">Toggle Dark Mode</string>
     <string name="change_language_hindi">Change language to Hindi</string>
     <string name="backup_encrypted">Backup (encrypted)</string>

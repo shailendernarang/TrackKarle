@@ -6,6 +6,7 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
     id 'com.google.gms.google-services'
     id 'com.google.firebase.crashlytics'
+    id 'com.google.firebase.firebase-perf'
 }
 
 def keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -22,7 +23,7 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 279008
+        versionCode 279009
         versionName "27.9.8"
 
         buildConfigField 'String', 'RATES_URL', '"https://api.example.com/wealthtracker/avg_rates.json"'
@@ -149,6 +150,8 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:33.4.0')
     implementation 'com.google.firebase:firebase-messaging-ktx'
     implementation 'com.google.firebase:firebase-crashlytics-ktx'
+    implementation 'com.google.firebase:firebase-analytics-ktx'
+    implementation 'com.google.firebase:firebase-perf-ktx'
 
     // Android 12+ splash screen API (backports behavior)
     implementation 'androidx.core:core-splashscreen:1.0.1'

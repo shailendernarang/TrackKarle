@@ -5,9 +5,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.wealthtracker.data.local.InvestmentEntity
-import com.example.wealthtracker.ui.charts.ModernChartUtils
+import com.example.wealthtracker.ui.charts.SafePieChart
 
 /**
  * Enhanced Dashboard Integration Example
@@ -57,12 +58,23 @@ fun EnhancedDashboardExample(
                                 type to invList.sumOf { it.amount }
                             }
                         
-                        ModernChartUtils.EnhancedPieChart(
+                        // Define colors for different investment types
+                        val chartColors = listOf(
+                            Color(0xFF6750A4), // Purple
+                            Color(0xFF7D5260), // Pink
+                            Color(0xFF625B71), // Gray
+                            Color(0xFF0B57D0), // Blue
+                            Color(0xFF006A6A), // Teal
+                            Color(0xFF984061)  // Rose
+                        )
+                        
+                        SafePieChart(
                             data = chartData,
+                            colors = chartColors,
                             modifier = Modifier.height(250.dp),
                             showLegend = true,
-                            showValues = true,
-                            animationEnabled = true
+                            animationEnabled = true,
+                            centerText = "Portfolio\nDistribution"
                         )
                     }
                 }
@@ -85,21 +97,13 @@ fun EnhancedDashboardExample(
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                     
-                    // Sample trend data (in real app, this would come from historical data)
-                    val trendData = listOf(
-                        "Jan" to 50000f,
-                        "Feb" to 65000f,
-                        "Mar" to 72000f,
-                        "Apr" to 68000f,
-                        "May" to 85000f,
-                        "Jun" to 92000f
-                    )
-                    
-                    ModernChartUtils.EnhancedLineChart(
-                        data = trendData,
-                        modifier = Modifier.fillMaxWidth(),
-                        showPoints = true,
-                        showArea = true
+                    // Placeholder for performance trends
+                    // In a real app, you would display historical performance here
+                    Text(
+                        text = "Performance trend chart would go here",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
                     )
                 }
             }
@@ -142,10 +146,12 @@ fun EnhancedDashboardExample(
  * EnhancedInsights(investments = investments)
  * 
  * // Replace chart sections with:
- * ModernChartUtils.EnhancedPieChart(
+ * SafePieChart(
  *     data = chartData,
+ *     colors = chartColors,
  *     showLegend = true,
- *     animationEnabled = true
+ *     animationEnabled = true,
+ *     centerText = "Portfolio"
  * )
  * 
  * // Use themed icons throughout:

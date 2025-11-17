@@ -201,11 +201,12 @@ fun DashboardScreen(
         },
         floatingActionButtonPosition = FabPosition.End
     ) { inner ->
-        val contentModifier = if (isWideTop) {
-            Modifier.fillMaxSize().padding(inner).padding(16.dp)
-        } else {
-            Modifier.fillMaxSize().padding(inner).padding(16.dp).verticalScroll(rememberScrollState())
-        }
+        // Apply vertical scroll for all screen sizes
+        val contentModifier = Modifier
+            .fillMaxSize()
+            .padding(inner)
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
         
         Box(Modifier.fillMaxSize()) {
             Column(contentModifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -286,9 +287,9 @@ fun DashboardScreen(
 
             if (isWide) {
                 // Two vertical halves: top (chart + recent side-by-side), bottom (insights full width)
-                Column(Modifier.fillMaxWidth().weight(1f)) {
+                Column(Modifier.fillMaxWidth()) {
                     // Top half
-                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(Modifier.fillMaxWidth().height(500.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         // Overall Allocation (left)
                         Box(Modifier.weight(1f).fillMaxHeight()) {
                             ChartSectionDashboard(items = filtered, filter = typeFilter, vizType = vizType, onVizTypeChange = { vizType = it })
@@ -818,7 +819,16 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
         val unknown = "Unknown"
         val unknownBank = "Unknown Bank"
         val grouped: Map<String, List<InvestmentEntity>> = when (val f = filter?.let { if (it == "Equity") "Stocks" else it }) {
-            "FD" -> items.groupBy { (it.bankName ?: unknownBank).ifBlank { unknownBank } }
+            "FD" -> items.groupBy { 
+                val bank = it.bankName ?: unknownBank
+                // Handle "Others" bank name specifically to prevent chart crashes
+                when {
+                    bank.isBlank() -> unknownBank
+                    bank == "Others" -> unknownBank
+                    bank == "Others (Custom Bank)" -> unknownBank
+                    else -> bank
+                }
+            }
             // Fallback to display 'type' when stockName is missing to avoid blank labels
             "Stocks" -> items.groupBy { ((it.stockName ?: it.type).ifBlank { unknown }) }
             "Gold" -> items.groupBy { (it.goldType ?: "Gold").ifBlank { "Gold" } }
@@ -830,8 +840,13 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
             null, "" -> items.groupBy { if (it.investmentType == "Equity") "Stocks" else it.investmentType }
             else -> items.groupBy { if (it.investmentType == "Equity") "Stocks" else it.investmentType }
         }
-        val pairs = grouped.map { it.key to it.value.sumOf { e -> e.amount } }
-            .sortedByDescending { it.second }
+        val pairs = grouped.mapNotNull { (key, entities) ->
+            // Safety checks to prevent chart crashes
+            if (key.isBlank() || entities.isEmpty()) return@mapNotNull null
+            val total = entities.sumOf { e -> e.amount }
+            if (total <= 0 || !total.isFinite()) return@mapNotNull null
+            key to total
+        }.sortedByDescending { it.second }
         val limit = 10
         if (pairs.size <= limit) pairs else {
             val top = pairs.take(limit)
@@ -909,81 +924,30 @@ private fun ChartSectionDashboard(items: List<InvestmentEntity>, filter: String?
                     }
                 }
             } else if (vizType == "Pie") {
-                var selectedLabel by remember(items, filter) { mutableStateOf<String?>(null) }
                 var animateOnToggle by remember(items, filter, vizType) { mutableStateOf(true) }
-                AndroidView(
-                    factory = { context ->
-                        com.example.wealthtracker.ui.charts.ChartUtils.createPieChart(context, onSurface)
-                    },
-                    update = { view ->
-                        val first = view.data == null
-                        com.example.wealthtracker.ui.charts.ChartUtils.bindPieData(view, data, colors, animateOnToggle)
-                        if (first) {
-                            val txtPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                color = onSurface
-                                textSize = 40f
-                                typeface = android.graphics.Typeface.create("montserrat", android.graphics.Typeface.BOLD)
-                            }
-                            val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                color = onSurfaceVariant
-                                strokeWidth = 6f
-                            }
-                            val chartRef = view
-                            view.marker = object : com.github.mikephil.charting.components.IMarker {
-                                private var label: String = ""
-                                override fun refreshContent(e: com.github.mikephil.charting.data.Entry?, highlight: com.github.mikephil.charting.highlight.Highlight?) {
-                                    val pe = e as? com.github.mikephil.charting.data.PieEntry ?: return
-                                    val ds = chartRef.data?.getDataSetByIndex(0) as? com.github.mikephil.charting.data.PieDataSet
-                                    val denom = (ds?.values?.sumOf { it.value.toDouble() } ?: 0.0).coerceAtLeast(1.0)
-                                    val pctRaw = (pe.value.toDouble() / denom * 100.0)
-                                    val pct = if (pctRaw > 0.0 && pctRaw < 0.1) 0.1 else kotlin.math.round(pctRaw * 10.0) / 10.0
-                                    label = "${pe.label}: ${FormatUtils.formatPercent(pct)}"
-                                }
-                                override fun draw(canvas: android.graphics.Canvas?, posX: Float, posY: Float) {
-                                    if (canvas == null || label.isBlank()) return
-                                    val centerX = chartRef.centerOffsets.x
-                                    val dir = if (posX >= centerX) 1f else -1f
-                                    val length = 150f
-                                    val startX = posX
-                                    val startY = posY
-                                    val endX = posX + dir * length
-                                    val endY = posY
-                                    canvas.drawLine(startX, startY, endX, endY, linePaint)
-                                    val textW = txtPaint.measureText(label)
-                                    val textX = if (dir > 0) endX + 12f else endX - 12f - textW
-                                    canvas.drawText(label, textX, endY + 10f, txtPaint)
-                                }
-                                override fun getOffset(): com.github.mikephil.charting.utils.MPPointF = com.github.mikephil.charting.utils.MPPointF(0f, 0f)
-                                override fun getOffsetForDrawingAtPoint(posX: Float, posY: Float): com.github.mikephil.charting.utils.MPPointF = getOffset()
-                            }
-                            view.setDrawMarkers(true)
-                            view.setOnChartValueSelectedListener(object : com.github.mikephil.charting.listener.OnChartValueSelectedListener {
-                                override fun onValueSelected(e: com.github.mikephil.charting.data.Entry?, h: com.github.mikephil.charting.highlight.Highlight?) {
-                                    selectedLabel = (e as? com.github.mikephil.charting.data.PieEntry)?.label
-                                }
-                                override fun onNothingSelected() { selectedLabel = null }
-                            })
-                        }
-                        if (animateOnToggle) animateOnToggle = false
-                    },
-                    modifier = Modifier.fillMaxWidth().height(240.dp)
+                
+                // Use new safe Compose pie chart instead of problematic MPAndroidChart
+                val composeColors = colors.map { Color(it) }
+                val centerText = when (filter) {
+                    "FD" -> "Fixed\nDeposits"
+                    "Stocks" -> "Stock\nPortfolio"
+                    "Mutual Fund" -> "Mutual\nFunds"
+                    else -> "Total\nInvestments"
+                }
+                
+                com.example.wealthtracker.ui.charts.SafePieChart(
+                    data = data,
+                    colors = composeColors,
+                    modifier = Modifier.fillMaxWidth(),
+                    showLegend = true,
+                    animationEnabled = animateOnToggle,
+                    centerText = centerText,
+                    onSliceClick = null  // Disable tap to avoid interfering with scroll
                 )
-                Spacer(Modifier.height(8.dp))
-                // Legend with percentages (hide < 0.5%)
-                val total = data.sumOf { it.second }.coerceAtLeast(1.0)
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    data.take(10).forEachIndexed { idx, (label, value) ->
-                        val pctRaw = (value / total * 100.0)
-                        if (pctRaw < 0.5) return@forEachIndexed
-                        val pct = if (pctRaw > 0.0 && pctRaw < 0.1) 0.1 else kotlin.math.round(pctRaw * 10.0) / 10.0
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 10.dp)) {
-                            androidx.compose.foundation.Canvas(modifier = Modifier.width(12.dp).height(12.dp)) {
-                                drawRect(color = Color(colors[idx % colors.size]))
-                            }
-                            Spacer(Modifier.width(6.dp))
-                            Text("${truncateLabel(label)}: ${FormatUtils.formatPercent(pct)}", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
+                
+                // Reset animation flag
+                LaunchedEffect(items, filter, vizType) {
+                    animateOnToggle = false
                 }
             } else {
                 var barAnimateOnToggle by remember(items, filter, vizType) { mutableStateOf(true) }
