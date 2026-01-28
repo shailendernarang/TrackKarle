@@ -32,7 +32,6 @@ import com.ss.wealthtracker.R
 import com.inmobi.ads.InMobiBanner
 import com.inmobi.ads.AdMetaInfo
 import com.inmobi.ads.listeners.BannerAdEventListener
-import com.ss.wealthtracker.BuildConfig
 import kotlin.math.pow
 
 // ------------------------ DATA + HELPERS ------------------------
@@ -109,30 +108,59 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 .padding(16.dp)
         ) {
             val ctx = LocalContext.current
-            if (BuildConfig.DEBUG) {
+            // InMobi banner ad (enabled for all builds with SDK init check)
+            run {
                 var adLoaded by remember { mutableStateOf(false) }
-                val banner = remember(ctx) { InMobiBanner(ctx, 10000535531L) }
-                DisposableEffect(Unit) {
-                    banner.setBannerSize(320, 50)
-                    banner.setListener(object : BannerAdEventListener() {
-                        override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
-                            adLoaded = true
+                var sdkInitialized by remember { mutableStateOf(com.inmobi.sdk.InMobiSdk.isSDKInitialized()) }
+                val banner = remember(ctx, sdkInitialized) {
+                    if (sdkInitialized) {
+                        try {
+                            InMobiBanner(ctx, 10000535531L)
+                        } catch (e: Exception) {
+                            android.util.Log.e("CalculatorsAd", "Failed to create InMobiBanner", e)
+                            null
                         }
-
-                        override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
-                            adLoaded = false
-                            android.util.Log.e(
-                                "CalculatorsAd",
-                                "InMobi banner failed: message=${status.message}, raw=$status"
-                            )
-                        }
-                    })
-                    banner.load()
-                    onDispose { banner.destroy() }
+                    } else null
                 }
-                if (adLoaded) {
+                
+                // Check SDK initialization periodically with timeout
+                LaunchedEffect(Unit) {
+                    var attempts = 0
+                    while (!sdkInitialized && attempts < 50) { // 5 second timeout
+                        kotlinx.coroutines.delay(100)
+                        sdkInitialized = com.inmobi.sdk.InMobiSdk.isSDKInitialized()
+                        attempts++
+                    }
+                    if (!sdkInitialized) {
+                        android.util.Log.w("CalculatorsAd", "InMobi SDK initialization timeout - ads disabled")
+                    }
+                }
+                
+                DisposableEffect(banner) {
+                    banner?.let { b ->
+                        b.setBannerSize(320, 50)
+                        b.setListener(object : BannerAdEventListener() {
+                            override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
+                                adLoaded = true
+                            }
+
+                            override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
+                                adLoaded = false
+                                android.util.Log.e(
+                                    "CalculatorsAd",
+                                    "InMobi banner failed: message=${status.message}, raw=$status"
+                                )
+                            }
+                        })
+                        b.load()
+                    }
+                    onDispose {
+                        banner?.destroy()
+                    }
+                }
+                if (adLoaded && banner != null) {
                     AndroidView(
-                        factory = { banner },
+                        factory = { banner!! },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)

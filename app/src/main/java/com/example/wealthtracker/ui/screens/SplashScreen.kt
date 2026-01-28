@@ -152,16 +152,13 @@ fun ModernSplashScreen(
     // Multiple animation values for complex effects
     val logoAlpha = animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = 600, delayMillis = 200),
+        animationSpec = tween(durationMillis = 100), // Instant fade in
         label = "logoAlpha"
     )
     
     val logoScale = animateFloatAsState(
-        targetValue = if (startAnimation) 1f else 0.5f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        targetValue = if (startAnimation) 1f else 0.9f, // Start almost full size
+        animationSpec = tween(durationMillis = 100),
         label = "logoScale"
     )
     
@@ -180,7 +177,7 @@ fun ModernSplashScreen(
     // Start animation and navigate
     LaunchedEffect(Unit) {
         startAnimation = true
-        delay(2000)
+        delay(1500) // Reduced from 2000ms
         onSplashComplete()
     }
     
@@ -204,39 +201,16 @@ fun ModernSplashScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(32.dp)
         ) {
-            // Animated Logo Container
-            val compositionResult = rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_investment))
-            val composition = compositionResult.value
-            
-            if (composition != null) {
-                val progress by animateLottieCompositionAsState(
-                    composition = composition,
-                    iterations = LottieConstants.IterateForever,
-                    isPlaying = true,
-                    speed = 1f,
-                    restartOnPlay = true
-                )
-                
-                LottieAnimation(
-                    composition = composition,
-                    progress = { progress },
-                    modifier = Modifier
-                        .size(140.dp)
-                        .alpha(logoAlpha.value)
-                        .scale(logoScale.value)
-                )
-            } else {
-                // Fallback icon if Lottie fails to load
-                Icon(
-                    imageVector = Icons.Default.AccountBalance,
-                    contentDescription = "App Logo",
-                    modifier = Modifier
-                        .size(140.dp)
-                        .alpha(logoAlpha.value)
-                        .scale(logoScale.value),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            // Animated Logo Container - Lottie handles its own loading
+            val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_investment))
+            LottieAnimation(
+                composition = composition,
+                iterations = LottieConstants.IterateForever,
+                modifier = Modifier
+                    .size(140.dp)
+                    .alpha(logoAlpha.value)
+                    .scale(logoScale.value)
+            )
             
             Spacer(modifier = Modifier.height(40.dp))
             

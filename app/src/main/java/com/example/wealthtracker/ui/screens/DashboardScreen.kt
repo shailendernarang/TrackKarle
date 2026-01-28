@@ -57,6 +57,7 @@ import com.example.wealthtracker.ui.InvestmentViewModel
 import com.example.wealthtracker.util.FormatUtils
 import com.example.wealthtracker.ui.components.RatingPromptDialog
 import com.example.wealthtracker.ui.components.RatingPromptManager
+import com.example.wealthtracker.ui.components.MarketIndicesMarquee
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -241,6 +242,12 @@ fun DashboardScreen(
                     )
                 }
             }
+
+            // Market indices marquee
+            MarketIndicesMarquee(
+                modifier = Modifier.fillMaxWidth(),
+                refreshIntervalSeconds = 30
+            )
 
             // Summary cards
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

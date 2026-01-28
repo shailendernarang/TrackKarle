@@ -32,6 +32,9 @@ import android.content.Intent
 import android.net.Uri
 import com.ss.wealthtracker.BuildConfig
 import com.example.wealthtracker.util.BiometricUtils
+import com.example.wealthtracker.analytics.AnalyticsManager
+import com.example.wealthtracker.analytics.TrackScreen
+import androidx.compose.runtime.remember
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +60,8 @@ fun SettingsScreen(
         }
     ) { inner ->
         val ctx = LocalContext.current
+        val analytics = remember { AnalyticsManager(ctx) }
+        TrackScreen(screenName = "Settings", analyticsManager = analytics)
         val isDeviceLockAvailable = BiometricUtils.isDeviceLockAvailable(ctx)
         
         Column(
@@ -69,7 +74,10 @@ fun SettingsScreen(
             SettingRow(
                 title = stringResource(id = R.string.toggle_dark_mode),
                 checked = darkMode,
-                onToggle = onToggleDarkMode
+                onToggle = {
+                    onToggleDarkMode()
+                    analytics.logSettingChanged("dark_mode", if (darkMode) "off" else "on")
+                }
             )
             HorizontalDivider()
             
@@ -78,14 +86,20 @@ fun SettingsScreen(
                 SettingRow(
                     title = if (requireDeviceLock) stringResource(id = R.string.require_device_lock_on) else stringResource(id = R.string.require_device_lock_off),
                     checked = requireDeviceLock,
-                    onToggle = onToggleRequireDeviceLock
+                    onToggle = {
+                        onToggleRequireDeviceLock()
+                        analytics.logSettingChanged("require_device_lock", if (requireDeviceLock) "off" else "on")
+                    }
                 )
                 HorizontalDivider()
             }
             SettingRow(
                 title = stringResource(id = R.string.change_language_hindi),
                 checked = useHindiNumerals,
-                onToggle = onToggleHindiNumerals
+                onToggle = {
+                    onToggleHindiNumerals()
+                    analytics.logSettingChanged("use_hindi_numerals", if (useHindiNumerals) "off" else "on")
+                }
             )
             HorizontalDivider()
             

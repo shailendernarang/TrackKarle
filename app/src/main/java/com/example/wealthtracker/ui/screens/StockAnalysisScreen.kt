@@ -20,9 +20,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.AnimatedVisibility
@@ -46,10 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.util.Log
 import com.example.wealthtracker.network.StocksApiProvider
+import com.example.wealthtracker.ui.components.MarketIndicesMarquee
 import com.inmobi.ads.InMobiBanner
 import com.inmobi.ads.AdMetaInfo
 import com.inmobi.ads.listeners.BannerAdEventListener
-import com.ss.wealthtracker.BuildConfig
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
@@ -211,30 +211,48 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
             selectedName = resolvedSymbol
 
             val svc = StocksApiProvider.service
-            val chart =
-                runCatching { svc.chart(resolvedSymbol, range, interval) }.getOrNull()
+            val chartResult = runCatching { svc.chart(resolvedSymbol, range, interval) }
+            
+            // Log API call result
+            chartResult.onFailure { e ->
+                Log.e("StockAnalysis", "Chart API failed for $resolvedSymbol: ${e.message}", e)
+            }
+            
+            val chart = chartResult.getOrNull()
 
-            if (chart != null) {
-                val r = chart.chart.result.firstOrNull()
-                val times = r?.timestamp ?: emptyList()
-                val closes = r?.indicators?.quote?.firstOrNull()?.close ?: emptyList()
+            // Extract chart data if available
+            val r = chart?.chart?.result?.firstOrNull()
+            val times = r?.timestamp ?: emptyList()
+            val closes = r?.indicators?.quote?.firstOrNull()?.close ?: emptyList()
 
-                chartPoints = times.zip(closes).mapNotNull { (t, c) ->
-                    if (c != null) t to c else null
-                }
-                // Save last selection
-                prefs.edit().putString("last_symbol", resolvedSymbol).putString("last_name", selectedName).apply()
-                // Update recents (most recent first, unique by symbol, keep 4)
-                val newItem = Suggestion(resolvedSymbol!!, selectedName ?: resolvedSymbol)
-                val merged = (listOf(newItem) + recent.filterNot { it.symbol.equals(resolvedSymbol, true) }).take(4)
-                recent = merged
-                saveRecents(merged)
-                // Fetch related news for selected
-                val qForNews = selectedName ?: resolvedSymbol
-                relatedNews = fetchRelatedNews(qForNews ?: resolvedSymbol)
-                relatedNewsMc = fetchRelatedMcNews(qForNews ?: resolvedSymbol)
-            } else {
-                error = "Failed to fetch chart"
+            chartPoints = times.zip(closes).mapNotNull { (t, c) ->
+                if (c != null) t to c else null
+            }
+            
+            // Log for debugging
+            Log.d("StockAnalysis", "Symbol: $resolvedSymbol, Chart response: ${chart != null}, Results: ${chart?.chart?.result?.size ?: 0}, Points: ${chartPoints.size}")
+            if (chart != null && chartPoints.isEmpty()) {
+                Log.w("StockAnalysis", "Chart API returned data but no valid points. Timestamps: ${times.size}, Closes: ${closes.size}")
+            }
+            
+            // Save last selection
+            prefs.edit().putString("last_symbol", resolvedSymbol).putString("last_name", selectedName).apply()
+            // Update recents (most recent first, unique by symbol, keep 4)
+            val newItem = Suggestion(resolvedSymbol!!, selectedName ?: resolvedSymbol)
+            val merged = (listOf(newItem) + recent.filterNot { it.symbol.equals(resolvedSymbol, true) }).take(4)
+            recent = merged
+            saveRecents(merged)
+            
+            // Always fetch related news for selected symbol, even if chart data is empty
+            val qForNews = selectedName ?: resolvedSymbol
+            relatedNews = fetchRelatedNews(qForNews ?: resolvedSymbol)
+            relatedNewsMc = fetchRelatedMcNews(qForNews ?: resolvedSymbol)
+            
+            // Set error only if we got no chart response AND no data points
+            if (chart == null) {
+                error = "Failed to fetch chart data from API"
+            } else if (chartPoints.isEmpty()) {
+                error = "No chart data available for this symbol. News is still available below."
             }
 
             isLoading = false
@@ -272,8 +290,10 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
                     val code = o["sc_id"]?.asString ?: o["sid"]?.asString
                     val exch = o["ex"]?.asString ?: o["exchange"]?.asString
 
-                    if (!name.isNullOrBlank()) Suggestion(symbol ?: name, name, code, exch)
-                    else null
+                    // Only create suggestion if we have both name and symbol
+                    if (!name.isNullOrBlank() && !symbol.isNullOrBlank()) {
+                        Suggestion(symbol, name, code, exch)
+                    } else null
                 }
             }.getOrElse { emptyList() }
         }
@@ -343,12 +363,20 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(16.dp)
-                .verticalScroll(scroll),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // Marquee removed
+            // Market indices marquee at the top
+            MarketIndicesMarquee(
+                modifier = Modifier.fillMaxWidth(),
+                refreshIntervalSeconds = 30
+            )
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(scroll),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
 
             // Search + suggestions (hide when stock is selected)
             if (selectedSymbol.isNullOrBlank()) {
@@ -437,31 +465,60 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
 
             // News blocks
             NewsSection("Market News", marketNews)
-            if (BuildConfig.DEBUG) {
+            // InMobi banner ad (enabled for all builds with SDK init check)
+            run {
                 val ctx = androidx.compose.ui.platform.LocalContext.current
                 var adLoaded by remember { mutableStateOf(false) }
-                val banner = remember(ctx) { InMobiBanner(ctx, 10000535531L) }
-                DisposableEffect(Unit) {
-                    banner.setBannerSize(320, 50)
-                    banner.setListener(object : BannerAdEventListener() {
-                        override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
-                            adLoaded = true
+                var sdkInitialized by remember { mutableStateOf(com.inmobi.sdk.InMobiSdk.isSDKInitialized()) }
+                val banner = remember(ctx, sdkInitialized) {
+                    if (sdkInitialized) {
+                        try {
+                            InMobiBanner(ctx, 10000535531L)
+                        } catch (e: Exception) {
+                            android.util.Log.e("StockAnalysisAd", "Failed to create InMobiBanner", e)
+                            null
                         }
-
-                        override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
-                            adLoaded = false
-                            android.util.Log.e(
-                                "StockAnalysisAd",
-                                "InMobi banner failed: message=${status.message}, raw=$status"
-                            )
-                        }
-                    })
-                    banner.load()
-                    onDispose { banner.destroy() }
+                    } else null
                 }
-                if (adLoaded) {
+                
+                // Check SDK initialization periodically with timeout
+                LaunchedEffect(Unit) {
+                    var attempts = 0
+                    while (!sdkInitialized && attempts < 50) { // 5 second timeout
+                        delay(100)
+                        sdkInitialized = com.inmobi.sdk.InMobiSdk.isSDKInitialized()
+                        attempts++
+                    }
+                    if (!sdkInitialized) {
+                        android.util.Log.w("StockAnalysisAd", "InMobi SDK initialization timeout - ads disabled")
+                    }
+                }
+                
+                DisposableEffect(banner) {
+                    banner?.let { b ->
+                        b.setBannerSize(320, 50)
+                        b.setListener(object : BannerAdEventListener() {
+                            override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
+                                adLoaded = true
+                            }
+
+                            override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
+                                adLoaded = false
+                                android.util.Log.e(
+                                    "StockAnalysisAd",
+                                    "InMobi banner failed: message=${status.message}, raw=$status"
+                                )
+                            }
+                        })
+                        b.load()
+                    }
+                    onDispose {
+                        banner?.destroy()
+                    }
+                }
+                if (adLoaded && banner != null) {
                     AndroidView(
-                        factory = { banner },
+                        factory = { banner!! },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
@@ -470,6 +527,7 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
             }
             NewsSection("Top 10 Stocks - News", top10News)
             NewsSection("Top 10 Penny Stocks - News", pennyNews)
+            }
         }
     }
 } // THIS BRACE FIXES YOUR FILE
@@ -549,7 +607,7 @@ private fun NewsListAll(items: List<NewsItem>) {
                             color = MaterialTheme.colorScheme.primary
                         )
                         Icon(
-                            imageVector = Icons.Default.OpenInNew,
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant

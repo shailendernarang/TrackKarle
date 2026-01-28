@@ -48,7 +48,17 @@ data class ChartResponse(val chart: ChartResult)
 
 data class ChartResult(val result: List<ChartEntry> = emptyList())
 
-data class ChartEntry(val timestamp: List<Long> = emptyList(), val indicators: Indicators? = null)
+data class ChartEntry(
+    val timestamp: List<Long> = emptyList(), 
+    val indicators: Indicators? = null,
+    val meta: ChartMeta? = null
+)
+
+data class ChartMeta(
+    val regularMarketPrice: Double? = null,
+    val chartPreviousClose: Double? = null,
+    val previousClose: Double? = null
+)
 
 data class Indicators(val quote: List<IndicatorQuote> = emptyList())
 

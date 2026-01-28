@@ -14,10 +14,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 
 @HiltViewModel
 class InvestmentViewModel @Inject constructor(
-    private val repo: InvestmentRepository
+    private val repo: InvestmentRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val investments: StateFlow<List<InvestmentEntity>> =
@@ -26,6 +29,9 @@ class InvestmentViewModel @Inject constructor(
             started = SharingStarted.Lazily,
             initialValue = emptyList()
         )
+
+    // Fast count check for routing (doesn't load all data)
+    suspend fun hasInvestments(): Boolean = repo.getInvestmentCount() > 0
 
     // Filters
     private val _typeFilter = MutableStateFlow<String?>(null)
@@ -68,6 +74,7 @@ class InvestmentViewModel @Inject constructor(
             viewModelScope.launch {
                 repo.addInvestment(name, amount, cleanType, null)
                 _message.value = "Added"
+                com.example.wealthtracker.widget.PortfolioWidgetProvider.updateAllWidgets(context)
             }
             return
         }
@@ -75,6 +82,8 @@ class InvestmentViewModel @Inject constructor(
             // Store type field as the investmentType for simpler display
             repo.addInvestment(cleanType, amount, cleanType, bankName)
             _message.value = "Added"
+            // Update widget after adding investment
+            com.example.wealthtracker.widget.PortfolioWidgetProvider.updateAllWidgets(context)
         }
     }
 
@@ -108,6 +117,8 @@ class InvestmentViewModel @Inject constructor(
         viewModelScope.launch {
             repo.addInvestmentFull(entity)
             _message.value = "Added"
+            // Update widget after adding investment
+            com.example.wealthtracker.widget.PortfolioWidgetProvider.updateAllWidgets(context)
         }
     }
 

@@ -59,4 +59,7 @@
     <string name="viz_bar">बार</string>
     <string name="no_data_to_visualize">दिखाने के लिए डेटा नहीं</string>
     <string name="unknown_bank">अज्ञात बैंक</string>
+    <!-- Widget -->
+    <string name="widget_description">होम स्क्रीन पर आपका पोर्टफोलियो सारांश दिखाता है</string>
+    <string name="change_language_hindi">हिंदी भाषा में बदलें</string>
 </resources>

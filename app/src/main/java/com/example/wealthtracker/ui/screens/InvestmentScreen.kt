@@ -92,7 +92,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.wealthtracker.analytics.AnalyticsManager
+import com.example.wealthtracker.analytics.TrackScreen
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
@@ -447,6 +451,32 @@ fun InvestmentScreen(
     var pendingAddHighlight by remember { mutableStateOf(false) }
     var showCelebration by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val analytics = remember(context) { AnalyticsManager(context) }
+    TrackScreen(screenName = "Investment", analyticsManager = analytics)
+
+    LaunchedEffect(Unit) {
+        analytics.logInvestmentCreationStarted(invType)
+    }
+
+    LaunchedEffect(invType) {
+        analytics.logInvestmentTypeSelected(invType)
+    }
+
+    // Log FD bank selection
+    LaunchedEffect(selectedBank, invType) {
+        if (invType == "FD" && selectedBank != null) {
+            analytics.logFeatureUsed(featureName = "fd_bank_selected", context = "Investment")
+        }
+    }
+
+    // Log investment added on success
+    LaunchedEffect(message) {
+        if (message == "Added") {
+            analytics.logInvestmentAdded(invType)
+        }
+    }
+
     // Debounced suggestions for MF and Stocks
     LaunchedEffect(mfName, invType, mfJustSelected, mfCommittedName, mfHasFocus) {
         if (mfJustSelected) { mfJustSelected = false; return@LaunchedEffect }
@@ -646,30 +676,58 @@ fun InvestmentScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (BuildConfig.DEBUG) {
+                        // InMobi banner ad (enabled for all builds)
+                        run {
                             var adLoaded by remember { mutableStateOf(false) }
-                            val banner = remember(ctx) { InMobiBanner(ctx, 10000535531L) }
-                            DisposableEffect(Unit) {
-                                banner.setBannerSize(320, 50)
-                                banner.setListener(object : BannerAdEventListener() {
-                                    override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
-                                        adLoaded = true
+                            var sdkInitialized by remember { mutableStateOf(com.inmobi.sdk.InMobiSdk.isSDKInitialized()) }
+                            val banner = remember(ctx, sdkInitialized) {
+                                if (sdkInitialized) {
+                                    try {
+                                        InMobiBanner(ctx, 10000535531L)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("InvestmentAd", "Failed to create InMobiBanner", e)
+                                        null
                                     }
-
-                                    override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
-                                        adLoaded = false
-                                        android.util.Log.e(
-                                            "InvestmentAd",
-                                            "InMobi banner failed: message=${status.message}, raw=$status"
-                                        )
-                                    }
-                                })
-                                banner.load()
-                                onDispose { banner.destroy() }
+                                } else null
                             }
-                            if (adLoaded) {
+                            
+                            // Check SDK initialization periodically with timeout
+                            LaunchedEffect(Unit) {
+                                var attempts = 0
+                                while (!sdkInitialized && attempts < 50) { // 5 second timeout
+                                    kotlinx.coroutines.delay(100)
+                                    sdkInitialized = com.inmobi.sdk.InMobiSdk.isSDKInitialized()
+                                    attempts++
+                                }
+                                if (!sdkInitialized) {
+                                    android.util.Log.w("InvestmentAd", "InMobi SDK initialization timeout - ads disabled")
+                                }
+                            }
+                            DisposableEffect(banner) {
+                                banner?.let { b ->
+                                    b.setBannerSize(320, 50)
+                                    b.setListener(object : BannerAdEventListener() {
+                                        override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
+                                            adLoaded = true
+                                        }
+
+                                        override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
+                                            adLoaded = false
+                                            android.util.Log.e(
+                                                "InvestmentAd",
+                                                "InMobi banner failed: message=${status.message}, raw=$status"
+                                            )
+                                        }
+                                    })
+                                    b.load()
+                                }
+                                onDispose {
+                                    banner?.destroy()
+                                }
+                            }
+                            if (adLoaded && banner != null) {
                                 AndroidView(
-                                    factory = { banner },
+                                    factory = { banner!! },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(50.dp)

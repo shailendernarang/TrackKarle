@@ -111,19 +111,18 @@ class MainActivity : AppCompatActivity() {
         // Android 12+ system splash
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        // Initialize InMobi SDK only in debug builds (disable ads in release)
-        if (BuildConfig.DEBUG) {
-            val consent = JSONObject()
-            InMobiSdk.init(this, "0e5df5d4bc54481086e845d419babe7c", consent, object : SdkInitializationListener {
-                override fun onInitializationComplete(error: Error?) {
-                    if (error != null) {
-                        Log.e("InMobi", "Init failed", error)
-                    } else {
-                        Log.d("InMobi", "Init successful")
-                    }
+        // Initialize InMobi SDK for ads (enabled in all builds for impression tracking)
+        InMobiSdk.setLogLevel(InMobiSdk.LogLevel.DEBUG) // Enable verbose logging for debugging
+        val consent = JSONObject()
+        InMobiSdk.init(this, "0e5df5d4bc54481086e845d419babe7c", consent, object : SdkInitializationListener {
+            override fun onInitializationComplete(error: Error?) {
+                if (error != null) {
+                    Log.e("InMobi", "Init failed", error)
+                } else {
+                    Log.d("InMobi", "Init successful")
                 }
-            })
-        }
+            }
+        })
         // Notifications permission (Android 13+)
         requestNotificationPermission()
         // Log current FCM token for testing
@@ -168,32 +167,37 @@ class MainActivity : AppCompatActivity() {
                     var showComposeSplash by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
                     val fromNotification = intent?.getBooleanExtra("from_notification", false) == true
                     
-                    if (showComposeSplash) {
-                        ModernSplashScreen(
-                            onSplashComplete = {
-                                showComposeSplash = false
-                            }
-                        )
-                    } else {
-                        val nav = rememberNavController()
-                        // Create Hilt VM outside any localized provider to keep Activity context intact
-                        val vm: InvestmentViewModel = hiltViewModel()
-                        
-                        // Check if onboarding is completed and country is set
-                        val userPrefs = remember { UserPreferences(this@MainActivity) }
-                        val isOnboardingCompleted = OnboardingPrefs.isCompleted(this@MainActivity)
-                        val isCountrySet = userPrefs.isCountrySet()
-                        
-                        val startRoute = if (!isOnboardingCompleted) {
-                            "onboarding"
-                        } else if (!isCountrySet) {
-                            "countrySelection"
+                    // Initialize navigation early to avoid blank screen during transition
+                    val nav = rememberNavController()
+                    val vm: InvestmentViewModel = hiltViewModel()
+                    val userPrefs = remember { UserPreferences(this@MainActivity) }
+                    
+                    androidx.compose.animation.Crossfade(
+                        targetState = showComposeSplash,
+                        animationSpec = tween(150),
+                        label = "splash_transition"
+                    ) { isSplash ->
+                        if (isSplash) {
+                            ModernSplashScreen(
+                                onSplashComplete = {
+                                    showComposeSplash = false
+                                }
+                            )
                         } else {
-                            rememberStartRoute(fromNotification, vm)
-                        }
-                        
-                        if (startRoute != null) {
-                            NavHost(navController = nav, startDestination = startRoute) {
+                            // Check if onboarding is completed and country is set
+                            val isOnboardingCompleted = OnboardingPrefs.isCompleted(this@MainActivity)
+                            val isCountrySet = userPrefs.isCountrySet()
+                            
+                            val startRoute = if (!isOnboardingCompleted) {
+                                "onboarding"
+                            } else if (!isCountrySet) {
+                                "countrySelection"
+                            } else {
+                                rememberStartRoute(fromNotification, vm)
+                            }
+                            
+                            if (startRoute != null) {
+                                NavHost(navController = nav, startDestination = startRoute) {
                                 // Onboarding screen
                                 composable("onboarding") {
                                     OnboardingScreen(
@@ -476,6 +480,7 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             }
+                        }
                     }
                 }
             }
@@ -486,26 +491,8 @@ class MainActivity : AppCompatActivity() {
 private fun rememberStartRoute(fromNotification: Boolean, vm: InvestmentViewModel): String? {
     var route by remember(fromNotification) { mutableStateOf<String?>(null) }
     LaunchedEffect(fromNotification) {
-        if (fromNotification) {
-            val firstList = vm.investments.first()
-            route = if (firstList.isNotEmpty()) "dashboard" else "invest"
-        } else {
-            kotlinx.coroutines.coroutineScope {
-                val collector = launch {
-                    vm.investments.collect { list ->
-                        if (list.isNotEmpty() && route == null) {
-                            route = "dashboard"
-                        }
-                    }
-                }
-                launch {
-                    delay(600)
-                    if (route == null) route = "invest"
-                    collector.cancel()
-                }
-                // Both run; the first to set route wins
-            }
-        }
+        // Fast count query - doesn't load all investment data
+        route = if (vm.hasInvestments()) "dashboard" else "invest"
     }
     return route
 }

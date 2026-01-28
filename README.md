@@ -1,62 +1,85 @@
-# WealthTracker
+# TrackKaro (WealthTracker)
 
 Private, offline-first Android app to record manual investments and view a simple dashboard. No cloud. No login. Your data stays on-device.
 
-## Mandatory to have
-- **Privacy-first**: Offline only, no cloud, no analytics.
-- **Stable release builds**: ProGuard/R8 rules to preserve SQLCipher, Lottie, MPAndroidChart.
-- **Flicker-free locale switching**: Scoped, per-screen Hindi numerals support without Activity recreation.
-- **Accurate inputs**: Indian number formatting with cursor preservation and proper decimal handling.
-- **Dark mode compatibility**: Chart and UI text colors adapt to theme.
-- **Device lock support**: Optional device-credential overlay gate.
+## Core Features
 
-## MVP Features
-- Manual add: record investments with type, amount, and optional metadata (e.g., bank for FD).
-- Categories: FD, Mutual Fund, Equity, Gold, PPF/EPF, NPS, Others.
-- Dashboard: Totals, counts, and quick visualization (Pie/Bar).
-- Filters: View by investment type.
-- Exports: Share CSV and PDF reports.
-- Privacy: "Private • Offline • No cloud sync" across the app.
+### Investment Tracking
+- **Manual investment entry** with type, amount, and metadata (bank for FD, custom names)
+- **7 Investment Categories**: FD, Mutual Fund, Equity, Gold, PPF/EPF, NPS, Others
+- **Filtering & Sorting**: View by investment type, sort by amount/date
+- **Edit/Delete**: Three-dot menu for quick actions
 
-## Done (implemented)
-- **Locale switching without flicker** using a localized Compose context per-route; deferred apply on background.
-- **Dashboard charts via ChartUtils**: Centralized Pie/Bar setup, animations, and theming.
-- **CalculatorsScreen refactor**: Performance/stability (state hoisting, Lazy grid keys, deprecated API fixes).
-- **Start route helper**: Chooses between Dashboard/Invest based on data/notification/timeout.
-- **Release crash fix**: R8/ProGuard rules to preserve SQLCipher native methods and restore Lottie/MPAndroidChart animations.
-- **Dark mode chart text**: Uses Material theme colors.
-- **InvestmentScreen charts removed** (kept on Dashboard only) for simpler UX.
-- **Firebase Crashlytics** integrated (mapping upload enabled for release).
+### Dashboard & Visualization
+- **Portfolio overview**: Total value, counts, and breakdown
+- **Custom Compose Pie Charts**: Crash-free SafePieChart (replaced MPAndroidChart)
+- **Bar charts**: Investment distribution visualization
+- **25+ Investment Insights**: Metrics across all investment types
 
-### What's New (27.9.4)
+### Home Screen Widget
+- **Portfolio summary widget**: Shows top 3 investment types with progress bars
+- **Auto-refresh**: Widget updates when investments are added
+- **Hindi localization**: Widget description in Hindi
+
+### Privacy & Security
+- **Offline-only**: No cloud sync, no accounts
+- **SQLCipher encryption**: Encrypted local database
+- **Device lock support**: Optional biometric/PIN gate on launch
+- **No PII collection**: Analytics track behavior, not personal data
+
+### Localization
+- **Hindi numerals support**: Toggle in settings
+- **Flicker-free locale switching**: Per-screen without Activity recreation
+- **Indian number formatting**: Lakh/Crore with ₹ symbol
+
+### Exports
+- **CSV export**: Share investment data
+- **PDF reports**: Formatted portfolio reports
+
+### Calculators
+- **SIP Calculator**: Monthly investment projections
+- **Lumpsum Calculator**: CAGR-based projections
+- **FD Maturity Calculator**: Principal, rate, tenure calculations
+- **PPF/EPF Calculator**: Section 80C tracking
+
+### Analytics & Monitoring
+- **Firebase Analytics**: User behavior tracking (privacy-compliant)
+- **Firebase Crashlytics**: Crash reporting with mapping upload
+- **Performance Monitoring**: Custom traces for critical operations
+
+### Ads Integration
+- **InMobi SDK**: Banner ads with SDK initialization timeout handling
+
+---
+
+## What's New (27.9.5)
+- **Widget Improvements**:
+  - Progress bars replace colored views for better visualization
+  - Widget auto-refreshes when investments are added
+  - Hindi localization for widget description
+- **Analytics Enhancements**:
+  - Settings screen tracks dark mode, device lock, and language toggles
+  - Country selection tracks user preferences
+  - Screen view tracking for Settings and CountrySelection
+- **InMobi SDK Fixes**:
+  - SDK initialization with 5-second timeout
+  - Graceful fallback when SDK not initialized
+  - Better error logging for ad failures
+- **Code Quality**:
+  - Removed untracked testing strategy docs
+  - Fixed string translatable attribute for AdMob ID
+
+### Previous Release (27.9.4)
 - **Critical Fix**: First-launch crash resolved with comprehensive ProGuard/R8 rules
-  - Room entities preserved to prevent database initialization failures
-  - Compose functions protected from aggressive obfuscation
-  - Repository and data layer classes properly kept
-- **UI/UX Improvements**:
-  - Investment Type label: Increased spacing and text size for better readability
-  - Touch targets fixed: Date pickers and dropdowns now work on entire field, not just icon
-  - Three-dot menu: Edit/Delete actions consolidated into dropdown menu (saves screen space)
-  - FD Rates section: Responsive sizing for phone screens, reduced header and sort field sizes
-  - Numeric keyboards: All amount/rate/tenure fields now show numeric input
-  - Input field sizing: Reduced "add investment" area field heights for compact display
-- **Enhanced Insights**:
-  - Added 25+ new investment metrics across all types
-  - FD: Count, Banks, Highest Rate
-  - Stocks: Average per stock, Top 3 coverage
-  - Health Insurance: Total Premium, Avg Premium, Premium Range, Oldest Policy
-  - Mutual Fund: Investment Range, Top 3 Cover
-  - Gold: Investment Range, First Purchase
-  - PPF/EPF/NPS: Contribution Range, Oldest Account, Added This Year
-  - Term Insurance: Premium Range, Oldest Policy
-- **Font consistency**: Montserrat font applied throughout app with responsive sizing
-- **Test coverage**: 16/18 unit tests passing (FormatUtils 100% coverage)
+- **UI/UX Improvements**: Touch targets, three-dot menu, numeric keyboards
+- **Enhanced Insights**: 25+ new investment metrics across all types
+- **Font consistency**: Montserrat font throughout app
 
 ### Previous Release (27.9.2)
-- **Play variant as primary**: Standardized shipping on Play (plain) build.
-- **Data migration safety**: Forward/reverse migration with deduplication.
-- **UI polish for phones**: FAB navigation, centered CTAs, numeric keyboards.
-- **Branding consistency**: App name and exports use "TrackKaro".
+- **Play variant as primary**: Standardized shipping on Play (plain) build
+- **Data migration safety**: Forward/reverse migration with deduplication
+- **UI polish for phones**: FAB navigation, centered CTAs, numeric keyboards
+- **Branding consistency**: App name and exports use "TrackKaro"
 
 ### Publishing
 - **Gradle Play Publisher** configured. Publish with:
@@ -92,14 +115,15 @@ Private, offline-first Android app to record manual investments and view a simpl
   - Consider Robolectric for Android-dependent unit tests
 
 ## Tech Stack
-- UI: Jetpack Compose + Material 3
-- DI: Hilt
-- Navigation: Navigation Compose
-- Data: Room (data.local) with **SQLCipher** encryption
-- Charts: MPAndroidChart via AndroidView (with shared **ChartUtils**)
-- Language: Kotlin (Coroutines/Flow)
-- Messaging/Crash: Firebase Cloud Messaging, **Crashlytics**
-- Testing: JUnit 4, Mockito, Kotlinx Coroutines Test, Room Testing
+- **UI**: Jetpack Compose + Material 3
+- **DI**: Hilt
+- **Navigation**: Navigation Compose
+- **Data**: Room with SQLCipher encryption
+- **Charts**: Custom Compose SafePieChart (replaced MPAndroidChart)
+- **Language**: Kotlin (Coroutines/Flow)
+- **Analytics**: Firebase Analytics, Crashlytics, Performance Monitoring
+- **Ads**: InMobi SDK
+- **Testing**: JUnit 4, Mockito, Kotlinx Coroutines Test
 
 ## Project Structure
 - `app/src/main/java/com/example/wealthtracker/ui/` Compose screens and ViewModel
@@ -178,46 +202,12 @@ APK path: `app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 
-## India-Focused Small Feature Ideas
+## Backlog Ideas
 
-- Indian number formatting
-  - Keep "₹" and lakh/crore formatting everywhere.
-
-- Quick calculators
-  - SIP Calculator: Monthly amount, expected return, tenure → future value.
-  - Lumpsum MF Calculator: CAGR-based projection.
-  - FD Maturity Calculator: Principal, rate, tenure → maturity & interest.
-  - PPF/EPF: Yearly contribution projection and Section 80C tracker (cap ₹1.5L).
-
-- Tax-oriented helpers
-  - LTCG/STCG hints: Simple guidance per asset type; mark entries as long/short based on holding period.
-  - Deductions tracker: 80C (PPF, ELSS, EPF), 80D (health insurance), NPS (80CCD(1B)) tally against caps.
-
-- Mutual fund niceties
-  - AMFI meta: Fund house, category (Large/Small/Hybrid), scheme code.
-  - SIP reminders: Optional local notification on SIP date (offline).
-  - Folio placeholder: Store folio no. (manual), no sync.
-
-- FD details
-  - Bank directory: Pre-populated Indian banks (done for FD selection).
-  - Maturity reminders: Local notifications before maturity/auto-renew windows.
-
-- Gold & other assets
-  - Gold price reference: Allow manual entry + link to MCX reference (no auto-fetch).
-  - RE/Other: Name/location fields and notes for "Others".
-
-- Localization & accessibility
-  - Regional language support: Hindi first; localize numerals/labels/amounts.
-  - High-contrast mode: Accessibility-friendly theme variant.
-
-- Backup choices (still offline)
-  - Encrypted local backup to file with user PIN.
-  - Export/Import JSON that stays on device or is user-shared.
-
-- Security polish
-  - App lock: Optional 4-digit PIN or biometrics gate on launch.
-  - Sensitive masking: Hide/show amounts toggle on Dashboard.
-
-- UX polish
-  - Undo delete: Snackbar with "Undo".
-  - Quick add presets: Frequently used amounts/types/banks.
+- **Tax helpers**: LTCG/STCG hints, 80C/80D deductions tracker
+- **Mutual fund**: AMFI NAV fetch, SIP reminders, folio storage
+- **FD maturity reminders**: Local notifications before maturity
+- **Backup/Restore**: Encrypted JSON export/import
+- **App lock**: PIN or biometrics gate
+- **Amount masking**: Hide/show toggle on Dashboard
+- **Undo delete**: Snackbar with undo action

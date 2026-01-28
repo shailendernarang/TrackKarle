@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 // Canonical repository interface implemented by data.local.DefaultInvestmentRepository
 interface InvestmentRepository {
     fun observeInvestments(): Flow<List<InvestmentEntity>>
+    suspend fun getInvestmentCount(): Int
     suspend fun addInvestment(type: String, amount: Double, investmentType: String, bankName: String?)
     suspend fun addInvestmentFull(entity: InvestmentEntity)
     suspend fun deleteInvestment(entity: InvestmentEntity)

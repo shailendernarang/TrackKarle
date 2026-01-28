@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import com.example.wealthtracker.data.api.CurrencyApiService
 import com.example.wealthtracker.data.api.CountryCurrencyData
 import kotlinx.coroutines.launch
+import com.example.wealthtracker.analytics.AnalyticsManager
+import com.example.wealthtracker.analytics.TrackScreen
+import androidx.compose.ui.platform.LocalContext
 
 sealed class LoadingState {
     object Loading : LoadingState()
@@ -80,6 +83,10 @@ fun CountrySelectionScreen(
         }
     }
     
+    val context = LocalContext.current
+    val analytics = remember(context) { AnalyticsManager(context) }
+    TrackScreen(screenName = "CountrySelection", analyticsManager = analytics)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -212,7 +219,12 @@ fun CountrySelectionScreen(
             // Continue Button
             Button(
                 onClick = {
-                    selectedCountry?.let { onCountrySelected(it) }
+                    selectedCountry?.let {
+                        // Analytics: country preference set and user property
+                        analytics.logCountryPreferenceSet(country = it.countryName, context = "settings_change")
+                        analytics.setUserPreferences(preferredCurrency = it.currencyCode)
+                        onCountrySelected(it)
+                    }
                 },
                 enabled = selectedCountry != null,
                 modifier = Modifier

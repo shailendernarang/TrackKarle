@@ -166,16 +166,15 @@ class PortfolioWidgetProvider : AppWidgetProvider() {
                     
                     views.setTextViewText(nameId, shortType)
                     views.setTextViewText(amountId, FormatUtils.formatINRShort(amount))
-                    views.setInt(barId, "setBackgroundColor", colors[i])
                     
-                    // Set bar height based on relative amount (minimum 20% height)
-                    val heightPercent = ((amount / maxAmount) * 0.8 + 0.2).toFloat()
-                    views.setFloat(barId, "setScaleY", heightPercent)
+                    // Set progress based on relative amount (0..100)
+                    val progress = ((amount / maxAmount) * 100.0).toInt().coerceIn(1, 100)
+                    views.setProgressBar(barId, 100, progress, false)
                 } else {
                     // Hide unused bars
                     views.setTextViewText(nameId, "")
                     views.setTextViewText(amountId, "")
-                    views.setInt(barId, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+                    views.setProgressBar(barId, 100, 0, false)
                 }
             }
         }
