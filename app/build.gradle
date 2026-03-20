@@ -21,6 +21,27 @@ if (localPropertiesFile.exists()) {
     localProperties.load(new FileInputStream(localPropertiesFile))
 }
 
+configurations.all {
+    resolutionStrategy {
+        // Security: Force secure versions to fix CVEs in transitive dependencies
+        force 'com.google.code.gson:gson:2.11.0'
+        force 'commons-io:commons-io:2.18.0'
+        force 'com.google.protobuf:protobuf-java:4.28.2'
+        force 'com.google.protobuf:protobuf-javalite:4.28.2'
+        force 'com.google.protobuf:protobuf-kotlin:4.28.2'
+        force 'com.google.protobuf:protobuf-kotlin-lite:4.28.2'
+        force 'org.jdom:jdom2:2.0.6.1'
+        force 'org.bitbucket.b_c:jose4j:0.9.6'
+        // Netty: HTTP/2 Rapid Reset (CVE-2023-44487) and other vulnerabilities fixed in 4.1.100+
+        force 'io.netty:netty-handler:4.1.118.Final'
+        force 'io.netty:netty-codec-http2:4.1.118.Final'
+        // OkHttp: HTTP/2 client with latest security patches (Rapid Reset, MadeYouReset mitigations)
+        // Note: HTTP/2 server vulnerabilities don't affect client-only usage
+        force 'com.squareup.okhttp3:okhttp:4.12.0'
+        force 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    }
+}
+
 android {
     namespace 'com.ss.wealthtracker'
     compileSdk 35
