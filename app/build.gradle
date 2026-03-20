@@ -167,7 +167,7 @@ dependencies {
     implementation 'com.appodeal.ads.sdk.adapters:yandex:7.18.2.0'
 
     // Firebase (BOM pinned to latest stable to pick security fixes)
-    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation platform('com.google.firebase:firebase-bom:33.16.0')
     implementation 'com.google.firebase:firebase-messaging-ktx'
     implementation 'com.google.firebase:firebase-crashlytics-ktx'
     implementation 'com.google.firebase:firebase-analytics-ktx'
@@ -176,7 +176,7 @@ dependencies {
     // Android 12+ splash screen API (backports behavior)
     implementation 'androidx.core:core-splashscreen:1.0.1'
     // Encrypted storage and biometrics for optional device-lock-gated backups
-    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    implementation 'androidx.security:security-crypto:1.1.0'
     implementation 'androidx.biometric:biometric:1.2.0-alpha05'
     // DataStore for persisting app settings
     implementation 'androidx.datastore:datastore-preferences:1.1.1'
