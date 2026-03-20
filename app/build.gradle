@@ -26,10 +26,7 @@ configurations.all {
         // Security: Force secure versions to fix CVEs in transitive dependencies
         force 'com.google.code.gson:gson:2.11.0'
         force 'commons-io:commons-io:2.18.0'
-        force 'com.google.protobuf:protobuf-java:4.28.2'
-        force 'com.google.protobuf:protobuf-javalite:4.28.2'
-        force 'com.google.protobuf:protobuf-kotlin:4.28.2'
-        force 'com.google.protobuf:protobuf-kotlin-lite:4.28.2'
+        // Note: Protobuf versions managed by Firebase BoM to avoid conflicts with protolite
         force 'org.jdom:jdom2:2.0.6.1'
         force 'org.bitbucket.b_c:jose4j:0.9.6'
         // Netty: HTTP/2 Rapid Reset (CVE-2023-44487) and other vulnerabilities fixed in 4.1.100+
