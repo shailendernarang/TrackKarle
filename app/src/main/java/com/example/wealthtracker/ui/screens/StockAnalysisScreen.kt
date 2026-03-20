@@ -47,9 +47,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import android.util.Log
 import com.example.wealthtracker.network.StocksApiProvider
 import com.example.wealthtracker.ui.components.MarketIndicesMarquee
-import com.inmobi.ads.InMobiBanner
-import com.inmobi.ads.AdMetaInfo
-import com.inmobi.ads.listeners.BannerAdEventListener
+import com.example.wealthtracker.ui.components.AppodealBanner
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
@@ -465,66 +463,12 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
 
             // News blocks
             NewsSection("Market News", marketNews)
-            // InMobi banner ad (enabled for all builds with SDK init check)
-            run {
-                val ctx = androidx.compose.ui.platform.LocalContext.current
-                var adLoaded by remember { mutableStateOf(false) }
-                var sdkInitialized by remember { mutableStateOf(com.inmobi.sdk.InMobiSdk.isSDKInitialized()) }
-                val banner = remember(ctx, sdkInitialized) {
-                    if (sdkInitialized) {
-                        try {
-                            InMobiBanner(ctx, 10000535531L)
-                        } catch (e: Exception) {
-                            android.util.Log.e("StockAnalysisAd", "Failed to create InMobiBanner", e)
-                            null
-                        }
-                    } else null
-                }
-                
-                // Check SDK initialization periodically with timeout
-                LaunchedEffect(Unit) {
-                    var attempts = 0
-                    while (!sdkInitialized && attempts < 50) { // 5 second timeout
-                        delay(100)
-                        sdkInitialized = com.inmobi.sdk.InMobiSdk.isSDKInitialized()
-                        attempts++
-                    }
-                    if (!sdkInitialized) {
-                        android.util.Log.w("StockAnalysisAd", "InMobi SDK initialization timeout - ads disabled")
-                    }
-                }
-                
-                DisposableEffect(banner) {
-                    banner?.let { b ->
-                        b.setBannerSize(320, 50)
-                        b.setListener(object : BannerAdEventListener() {
-                            override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
-                                adLoaded = true
-                            }
-
-                            override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
-                                adLoaded = false
-                                android.util.Log.e(
-                                    "StockAnalysisAd",
-                                    "InMobi banner failed: message=${status.message}, raw=$status"
-                                )
-                            }
-                        })
-                        b.load()
-                    }
-                    onDispose {
-                        banner?.destroy()
-                    }
-                }
-                if (adLoaded && banner != null) {
-                    AndroidView(
-                        factory = { banner!! },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                    )
-                }
-            }
+            // Appodeal banner ad
+            AppodealBanner(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp)
+            )
             NewsSection("Top 10 Stocks - News", top10News)
             NewsSection("Top 10 Penny Stocks - News", pennyNews)
             }

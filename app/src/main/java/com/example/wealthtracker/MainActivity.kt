@@ -74,9 +74,9 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
-import com.inmobi.sdk.InMobiSdk
-import com.inmobi.sdk.SdkInitializationListener
-import org.json.JSONObject
+import com.appodeal.ads.Appodeal
+import com.appodeal.ads.initializing.ApdInitializationCallback
+import com.appodeal.ads.initializing.ApdInitializationError
 import com.google.firebase.messaging.FirebaseMessaging
 import com.ss.wealthtracker.R
 import com.ss.wealthtracker.BuildConfig
@@ -111,16 +111,71 @@ class MainActivity : AppCompatActivity() {
         // Android 12+ system splash
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        // Initialize InMobi SDK for ads (enabled in all builds for impression tracking)
-        InMobiSdk.setLogLevel(InMobiSdk.LogLevel.DEBUG) // Enable verbose logging for debugging
-        val consent = JSONObject()
-        InMobiSdk.init(this, "0e5df5d4bc54481086e845d419babe7c", consent, object : SdkInitializationListener {
-            override fun onInitializationComplete(error: Error?) {
-                if (error != null) {
-                    Log.e("InMobi", "Init failed", error)
-                } else {
-                    Log.d("InMobi", "Init successful")
+        
+        // Initialize Appodeal SDK for ads
+        Appodeal.setTesting(false) // Production mode - real ads
+        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.verbose) // Verbose logging
+        
+        // Enable 728x90 banners for tablets (devices > 7 inches)
+        Appodeal.set728x90Banners(true)
+        
+        // Enable shared ads instance to prevent reload on tab changes
+        Appodeal.setSharedAdsInstanceAcrossActivities(true)
+        
+        // Auto-caching is enabled by default - banners load automatically
+        // This prevents reload on navigation between screens
+        
+        // Log consent status
+        if (com.example.wealthtracker.consent.ConsentPrefs.isSet(this)) {
+            val hasConsent = com.example.wealthtracker.consent.ConsentPrefs.getValue(this)
+            Log.d("MainActivity", "User consent saved: $hasConsent")
+        } else {
+            Log.d("MainActivity", "No consent saved yet - dialog will show on first launch")
+        }
+        
+        // Initialize Appodeal SDK
+        // Note: SDK 4.0.0 doesn't support passing consent during initialization
+        // Consent is collected via custom dialog and saved to SharedPreferences
+        // Appodeal will use its built-in consent handling
+        Appodeal.initialize(
+            this,
+            com.ss.wealthtracker.BuildConfig.APPODEAL_API_KEY,
+            Appodeal.BANNER,
+            object : ApdInitializationCallback {
+                override fun onInitializationFinished(errors: List<ApdInitializationError>?) {
+                    val initResult = if (errors.isNullOrEmpty()) "successfully" else "with ${errors.size} errors"
+                    Log.d("Appodeal", "Initialized $initResult")
+                    errors?.forEach { error ->
+                        Log.e("Appodeal", "Init error: $error")
+                    }
                 }
+            }
+        )
+        
+        // Set banner callbacks for debugging
+        Appodeal.setBannerCallbacks(object : com.appodeal.ads.BannerCallbacks {
+            override fun onBannerLoaded(height: Int, isPrecache: Boolean) {
+                Log.d("Appodeal", "Banner loaded, height: $height, isPrecache: $isPrecache")
+            }
+            
+            override fun onBannerFailedToLoad() {
+                Log.e("Appodeal", "Banner failed to load")
+            }
+            
+            override fun onBannerShown() {
+                Log.d("Appodeal", "Banner shown")
+            }
+            
+            override fun onBannerShowFailed() {
+                Log.e("Appodeal", "Banner failed to show")
+            }
+            
+            override fun onBannerClicked() {
+                Log.d("Appodeal", "Banner clicked")
+            }
+            
+            override fun onBannerExpired() {
+                Log.d("Appodeal", "Banner expired")
             }
         })
         // Notifications permission (Android 13+)
@@ -166,6 +221,24 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     var showComposeSplash by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
                     val fromNotification = intent?.getBooleanExtra("from_notification", false) == true
+                    
+                    // Consent dialog state
+                    var showConsentDialog by remember { mutableStateOf(false) }
+                    
+                    // Check if consent dialog should be shown
+                    LaunchedEffect(Unit) {
+                        showConsentDialog = com.example.wealthtracker.consent.shouldShowConsentDialog(this@MainActivity)
+                    }
+                    
+                    // Show consent dialog if needed
+                    if (showConsentDialog) {
+                        com.example.wealthtracker.consent.ConsentDialog(
+                            onConsentGiven = { consented ->
+                                showConsentDialog = false
+                                Log.d("MainActivity", "User consent: $consented")
+                            }
+                        )
+                    }
                     
                     // Initialize navigation early to avoid blank screen during transition
                     val nav = rememberNavController()

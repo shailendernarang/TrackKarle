@@ -103,6 +103,35 @@ fun SettingsScreen(
             )
             HorizontalDivider()
             
+            // Ad Consent Management
+            androidx.compose.material3.TextButton(
+                onClick = {
+                    // Revoke consent and show dialog again
+                    com.example.wealthtracker.consent.revokeConsent(ctx)
+                    analytics.logSettingChanged("ad_consent", "revoked")
+                    // User needs to restart app to see consent dialog
+                    android.widget.Toast.makeText(
+                        ctx,
+                        "Consent reset. Please restart the app to update your preferences.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Manage Ad Consent",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            HorizontalDivider()
+            
             // Referral section
             if (onOpenReferral != null) {
                 androidx.compose.material3.TextButton(

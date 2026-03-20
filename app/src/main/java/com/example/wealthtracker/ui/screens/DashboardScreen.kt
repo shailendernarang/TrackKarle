@@ -46,9 +46,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.ImageLoader
 import coil.decode.SvgDecoder
-import com.inmobi.ads.InMobiBanner
-import com.inmobi.ads.AdMetaInfo
-import com.inmobi.ads.listeners.BannerAdEventListener
+import com.example.wealthtracker.ui.components.AppodealBanner
 import com.ss.wealthtracker.BuildConfig
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -144,40 +142,12 @@ fun DashboardScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (BuildConfig.DEBUG) {
-                        var adLoaded by remember { mutableStateOf(false) }
-                        val banner = remember(ctx) {
-                            InMobiBanner(ctx, /* placementId = */ 10000535531L)
-                        }
-                        DisposableEffect(Unit) {
-                            banner.setBannerSize(320, 50)
-                            banner.setListener(object : BannerAdEventListener() {
-                                override fun onAdLoadSucceeded(ad: InMobiBanner, info: AdMetaInfo) {
-                                    adLoaded = true
-                                }
-
-                                override fun onAdLoadFailed(ad: InMobiBanner, status: com.inmobi.ads.InMobiAdRequestStatus) {
-                                    adLoaded = false
-                                    android.util.Log.e(
-                                        "DashboardAd",
-                                        "InMobi banner failed: message=${status.message}, raw=$status"
-                                    )
-                                }
-                            })
-                            banner.load()
-                            onDispose {
-                                banner.destroy()
-                            }
-                        }
-                        if (adLoaded) {
-                            AndroidView(
-                                factory = { banner },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp)
-                            )
-                        }
-                    }
+                    // Appodeal banner ad
+                    AppodealBanner(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(90.dp)
+                    )
                     Spacer(Modifier.height(6.dp))
                     Row(
                         modifier = Modifier

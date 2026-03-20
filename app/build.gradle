@@ -15,6 +15,12 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def localPropertiesFile = rootProject.file("local.properties")
+def localProperties = new Properties()
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
+}
+
 android {
     namespace 'com.ss.wealthtracker'
     compileSdk 35
@@ -23,10 +29,11 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 279011
-        versionName "27.9.10"
+        versionCode 2710001
+        versionName "27.10.0"
 
         buildConfigField 'String', 'RATES_URL', '"https://api.example.com/wealthtracker/avg_rates.json"'
+        buildConfigField 'String', 'APPODEAL_API_KEY', '"' + (localProperties['appodeal.api.key'] ?: '') + '"'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -146,8 +153,16 @@ dependencies {
     // Lottie for animations
     implementation 'com.airbnb.android:lottie-compose:6.0.1'
 
-    // InMobi Ads SDK (Kotlin)
-    implementation 'com.inmobi.monetization:inmobi-ads-kotlin:11.1.0'
+    // Appodeal Ads SDK (includes built-in CMP for GDPR consent)
+    implementation 'com.appodeal.ads.sdk:core:4.0.0'
+    
+    // Appodeal Network Adapters (AdMob removed - account banned)
+    implementation 'com.appodeal.ads.sdk.adapters:applovin:13.5.1.0'
+    implementation 'com.appodeal.ads.sdk.adapters:bidmachine:3.5.0.0'
+    implementation 'com.appodeal.ads.sdk.adapters:meta:6.20.0.0'
+    implementation 'com.appodeal.ads.sdk.adapters:unity_ads:4.16.4.0'
+    implementation 'com.appodeal.ads.sdk.adapters:inmobi:11.1.0.0'
+    // Note: appodeal, mraid, vast adapters are built into core SDK and BidMachine
 
     // Firebase (BOM pinned to latest stable to pick security fixes)
     implementation platform('com.google.firebase:firebase-bom:33.5.1')

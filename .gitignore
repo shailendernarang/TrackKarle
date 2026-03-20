@@ -74,7 +74,10 @@ app/keystore/
 .cxx/
 
 # Google Services (e.g. APIs or Firebase)
-# google-services.json (keep this commented if you need it in repo)
+# google-services.json contains Firebase API keys - keep out of public repos
+# Add your own google-services.json from Firebase Console
+google-services.json
+app/google-services.json
 
 # Freeline
 freeline.py
@@ -94,11 +97,27 @@ vcs.xml
 # Kotlin
 .kotlin/
 
-# Documentation files (optional - uncomment if you don't want to track)
-# IMPLEMENTATION_SUMMARY.md
-# COMPLETE_IMPLEMENTATION_GUIDE.md
-# CURRENCY_INTEGRATION_COMPLETE.md
-# DYNAMIC_CURRENCY_AND_BANKS_COMPLETE.md
+# DS_Store
+.DS_Store
+**/.DS_Store
 
-# Test scripts (optional)
-# test_fresh_install.sh
+# Extra documentation files (internal setup guides, not needed in repo)
+APPODEAL_CONSENT_SETUP.md
+APP_ADS_TXT_SETUP_INSTRUCTIONS.md
+CMP_SETUP_GUIDE.md
+GOOGLE_PLAY_SUBMISSION_GUIDE.md
+PRIVACY_POLICY_APPODEAL_SECTION.md
+IMPLEMENTATION_SUMMARY.md
+COMPLETE_IMPLEMENTATION_GUIDE.md
+CURRENCY_INTEGRATION_COMPLETE.md
+DYNAMIC_CURRENCY_AND_BANKS_COMPLETE.md
+
+# app-ads.txt (host on your website, not in repo)
+app-ads.txt
+
+# Test scripts
+test_fresh_install.sh
+
+# Step-by-step guide assets
+app/src/main/assets/steps/
+app/src/main/assets/steps
