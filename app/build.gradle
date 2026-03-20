@@ -29,8 +29,8 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 2710001
-        versionName "27.10.0"
+        versionCode 2710101
+        versionName "27.10.1"
 
         buildConfigField 'String', 'RATES_URL', '"https://api.example.com/wealthtracker/avg_rates.json"'
         buildConfigField 'String', 'APPODEAL_API_KEY', '"' + (localProperties['appodeal.api.key'] ?: '') + '"'
