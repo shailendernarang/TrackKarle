@@ -2,6 +2,7 @@ package com.example.wealthtracker.ui.components
 
 import android.app.Activity
 import android.util.Log
+import android.view.ViewGroup
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.*
@@ -11,65 +12,59 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.appodeal.ads.Appodeal
-import com.appodeal.ads.BannerView
+import kotlinx.coroutines.delay
 
 /**
  * Appodeal Banner Ad Component
- * 
+ *
  * Dimensions per Appodeal docs:
  * - Standard: 320x50 (phones)
  * - Tablet: 728x90 (devices > 7 inches)
- * - Smart banners auto-adjust (enabled by default)
- * 
- * Caching: Auto-caching enabled by default
- * - Banners load automatically after initialization
- * - Shared instance across activities prevents reload on tab changes
- * - Call show() once, then banner persists across screens
+ *
+ * Key fixes:
+ * - getBannerView() returns a shared singleton View — must detach from old
+ *   parent before reattaching, otherwise it's invisible on non-first screens
+ * - show() called per screen entry so banner content is active after navigation
+ * - LaunchedEffect retries until SDK initializes (fixes blank banner on cold start)
  */
 @Composable
 fun AppodealBanner(
-    modifier: Modifier = Modifier,
-    placementName: String = "default"
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    var bannerShown by remember { mutableStateOf(false) }
-    
-    // Track when banner is shown to avoid calling show() multiple times
-    DisposableEffect(Unit) {
-        val activity = (context as? Activity) ?: (view.context as? Activity)
-        
-        // Show banner only if not already shown and SDK is initialized
-        if (!bannerShown && activity != null && Appodeal.isInitialized(Appodeal.BANNER)) {
-            Log.d("AppodealBanner", "Showing banner for the first time")
-            Appodeal.show(activity, Appodeal.BANNER_VIEW)
-            bannerShown = true
+
+    // Call show() each time this composable enters composition.
+    // BANNER_VIEW show() is idempotent — safe to call on every screen entry.
+    LaunchedEffect(Unit) {
+        val activity = (context as? Activity) ?: (view.context as? Activity) ?: return@LaunchedEffect
+
+        // Poll until SDK is initialized (max ~5 seconds, 200ms intervals)
+        var attempts = 0
+        while (!Appodeal.isInitialized(Appodeal.BANNER) && attempts < 25) {
+            delay(200)
+            attempts++
         }
-        
-        onDispose {
-            // Don't hide banner on dispose - let it persist across screens
-            Log.d("AppodealBanner", "Banner composable disposed, keeping banner visible")
+
+        if (Appodeal.isInitialized(Appodeal.BANNER)) {
+            Log.d("AppodealBanner", "show() called after ${attempts * 200}ms wait")
+            Appodeal.show(activity, Appodeal.BANNER_VIEW)
+        } else {
+            Log.w("AppodealBanner", "SDK not initialized after 5s, banner skipped")
         }
     }
-    
+
     AndroidView(
         factory = { ctx ->
-            Log.d("AppodealBanner", "Getting BannerView from Appodeal SDK")
-            
-            // Get the BannerView from Appodeal SDK
-            // With setSharedAdsInstanceAcrossActivities(true), this returns the same instance
             val bannerView = Appodeal.getBannerView(ctx)
-            
-            if (bannerView != null) {
-                Log.d("AppodealBanner", "Got banner view from Appodeal")
-            } else {
-                Log.w("AppodealBanner", "BannerView is null, creating fallback")
-            }
-            
-            bannerView ?: BannerView(ctx)
+            // BannerView is a shared singleton — detach from old parent first.
+            // A View can only have one parent; skipping this makes it invisible
+            // on every screen after the first one that displayed it.
+            (bannerView.parent as? ViewGroup)?.removeView(bannerView)
+            bannerView
         },
         modifier = modifier
             .fillMaxWidth()
-            .height(90.dp) // Standard height, will auto-adjust for tablets (728x90)
+            .height(90.dp)
     )
 }

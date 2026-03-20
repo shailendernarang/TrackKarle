@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         
         // Initialize Appodeal SDK for ads
         Appodeal.setTesting(false) // Production mode - real ads
-        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.verbose) // Verbose logging
+        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.none) // silent in production
         
         // Enable 728x90 banners for tablets (devices > 7 inches)
         Appodeal.set728x90Banners(true)
@@ -125,18 +125,8 @@ class MainActivity : AppCompatActivity() {
         // Auto-caching is enabled by default - banners load automatically
         // This prevents reload on navigation between screens
         
-        // Log consent status
-        if (com.example.wealthtracker.consent.ConsentPrefs.isSet(this)) {
-            val hasConsent = com.example.wealthtracker.consent.ConsentPrefs.getValue(this)
-            Log.d("MainActivity", "User consent saved: $hasConsent")
-        } else {
-            Log.d("MainActivity", "No consent saved yet - dialog will show on first launch")
-        }
-        
         // Initialize Appodeal SDK
-        // Note: SDK 4.0.0 doesn't support passing consent during initialization
-        // Consent is collected via custom dialog and saved to SharedPreferences
-        // Appodeal will use its built-in consent handling
+        // Appodeal auto-CMP handles GDPR/CCPA consent (enabled by support team)
         Appodeal.initialize(
             this,
             com.ss.wealthtracker.BuildConfig.APPODEAL_API_KEY,
@@ -147,6 +137,10 @@ class MainActivity : AppCompatActivity() {
                     Log.d("Appodeal", "Initialized $initResult")
                     errors?.forEach { error ->
                         Log.e("Appodeal", "Init error: $error")
+                    }
+                    // Explicitly start caching banner right after init so it's ready ASAP
+                    runOnUiThread {
+                        Appodeal.cache(this@MainActivity, Appodeal.BANNER)
                     }
                 }
             }
@@ -221,24 +215,6 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     var showComposeSplash by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
                     val fromNotification = intent?.getBooleanExtra("from_notification", false) == true
-                    
-                    // Consent dialog state
-                    var showConsentDialog by remember { mutableStateOf(false) }
-                    
-                    // Check if consent dialog should be shown
-                    LaunchedEffect(Unit) {
-                        showConsentDialog = com.example.wealthtracker.consent.shouldShowConsentDialog(this@MainActivity)
-                    }
-                    
-                    // Show consent dialog if needed
-                    if (showConsentDialog) {
-                        com.example.wealthtracker.consent.ConsentDialog(
-                            onConsentGiven = { consented ->
-                                showConsentDialog = false
-                                Log.d("MainActivity", "User consent: $consented")
-                            }
-                        )
-                    }
                     
                     // Initialize navigation early to avoid blank screen during transition
                     val nav = rememberNavController()
