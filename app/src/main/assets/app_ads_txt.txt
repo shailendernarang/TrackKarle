@@ -1,4 +1,4 @@
-#Updated 10.03.2026
+#Updated 20.03.2026
 
 #Appodeal
 
@@ -9,6 +9,10 @@ appodeal.com, 262296, DIRECT
 bidmachine.io,1,DIRECT
 
 bidmachine.io,466,DIRECT
+
+#Yandex Advertising Network (YAN)
+
+yandex.com, 322305049, DIRECT
 
 #AdMob
 

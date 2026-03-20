@@ -115,6 +115,9 @@ DYNAMIC_CURRENCY_AND_BANKS_COMPLETE.md
 # app-ads.txt (host on your website, not in repo)
 app-ads.txt
 
+# Reference/legal docs (not needed in repo)
+app/yandex.txt
+
 # Test scripts
 test_fresh_install.sh
 
