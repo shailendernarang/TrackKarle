@@ -194,8 +194,6 @@ class MainActivity : AppCompatActivity() {
             var showPrivacyConsent by remember { mutableStateOf(false) }
             var analyticsEnabled by remember { mutableStateOf(true) }
             var crashReportingEnabled by remember { mutableStateOf(true) }
-            var isPremium by remember { mutableStateOf(false) }
-            
             LaunchedEffect(Unit) {
                 // Load persisted settings
                 darkMode = SettingsStore.darkModeFlow(applicationContext).first()
@@ -480,10 +478,8 @@ class MainActivity : AppCompatActivity() {
                                                 .setCrashlyticsCollectionEnabled(crashReportingEnabled)
                                             Log.d("Privacy", "Crash reporting ${if (crashReportingEnabled) "enabled" else "disabled"}")
                                         },
-                                        isPremium = isPremium,
                                         onBack = { nav.popBackStack() },
-                                        onOpenReferral = { nav.navigate("referral") },
-                                        onOpenPremium = { nav.navigate("premium") }
+                                        onOpenReferral = { nav.navigate("referral") }
                                     )
                                 }
                                 composable(
@@ -522,17 +518,7 @@ class MainActivity : AppCompatActivity() {
                                         onBack = { nav.popBackStack() }
                                     )
                                 }
-                                composable(
-                                    "premium",
-                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
-                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
-                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
-                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
-                                ) {
-                                    com.example.wealthtracker.ui.screens.PremiumScreen(
-                                        onBack = { nav.popBackStack() }
-                                    )
-                                }
+
                             }
                             }
                             // App lock overlay when required and not authenticated: system device credential
