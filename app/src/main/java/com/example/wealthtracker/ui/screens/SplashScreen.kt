@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -201,15 +202,28 @@ fun ModernSplashScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(32.dp)
         ) {
-            // PNG icon loads instantly (no async parse); gold on dark bg is brand-consistent
-            Image(
-                painter = painterResource(id = R.mipmap.ic_launcher_legacy),
-                contentDescription = null,
+            // Shadow + rounded clip removes the black rectangular border baked into the PNG
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(110.dp)
                     .alpha(logoAlpha.value)
                     .scale(logoScale.value)
-            )
+                    .shadow(
+                        elevation = 12.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        clip = false,
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                    )
+                    .clip(RoundedCornerShape(24.dp))
+                    .size(110.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher_legacy),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             
             Spacer(modifier = Modifier.height(40.dp))
             
