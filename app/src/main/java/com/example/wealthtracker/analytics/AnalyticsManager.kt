@@ -8,6 +8,7 @@ import com.google.firebase.ktx.Firebase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.wealthtracker.ui.components.PrivacyPreferences
 
 @Singleton
 class AnalyticsManager @Inject constructor(
@@ -16,9 +17,18 @@ class AnalyticsManager @Inject constructor(
     private val firebaseAnalytics: FirebaseAnalytics by lazy {
         Firebase.analytics
     }
+    
+    /**
+     * Check if analytics is enabled by user consent
+     */
+    private fun isAnalyticsEnabled(): Boolean {
+        return PrivacyPreferences.isAnalyticsEnabled(context)
+    }
 
     // Screen tracking events
     fun logScreenView(screenName: String, screenClass: String? = null) {
+        if (!isAnalyticsEnabled()) return
+        
         val bundle = Bundle().apply {
             putString(FirebaseAnalytics.Param.SCREEN_NAME, screenName)
             screenClass?.let { putString(FirebaseAnalytics.Param.SCREEN_CLASS, it) }
@@ -28,6 +38,7 @@ class AnalyticsManager @Inject constructor(
 
     // Investment related events
     fun logInvestmentCreationStarted(investmentType: String) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("investment_type", investmentType)
             putString("action", "investment_creation_started")
@@ -36,6 +47,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logInvestmentAdded(investmentType: String) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("investment_type", investmentType)
             putString("action", "investment_added_successfully")
@@ -44,6 +56,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logCountryPreferenceSet(country: String, context: String = "first_time_setup") {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("country", country)
             putString("selection_context", context) // "first_time_setup", "settings_change"
@@ -52,6 +65,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logInvestmentTypeSelected(investmentType: String) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("investment_type", investmentType)
         }
@@ -60,6 +74,7 @@ class AnalyticsManager @Inject constructor(
 
     // Filter and search events
     fun logFilterUsed(filterType: String, filterValue: String, screenName: String) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("filter_type", filterType)
             putString("filter_value", filterValue)
@@ -69,6 +84,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logSearchPerformed(searchQuery: String, screenName: String, resultsCount: Int = 0) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString(FirebaseAnalytics.Param.SEARCH_TERM, searchQuery)
             putString("screen_name", screenName)
@@ -79,6 +95,7 @@ class AnalyticsManager @Inject constructor(
 
     // User engagement events
     fun logPlayStoreRedirect(source: String = "rating_prompt") {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("source", source)
             putString("destination", "play_store")
@@ -87,10 +104,12 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logRatingPromptShown() {
+        if (!isAnalyticsEnabled()) return
         firebaseAnalytics.logEvent("rating_prompt_shown", Bundle())
     }
 
     fun logRatingPromptInteraction(action: String) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("action", action) // "rate_now", "later", "dismiss"
         }
@@ -103,6 +122,7 @@ class AnalyticsManager @Inject constructor(
         investmentCount: Int,
         totalValue: Double? = null
     ) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("calculation_type", calculationType)
             putInt("investment_count", investmentCount)
@@ -112,6 +132,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logChartViewed(chartType: String, timeRange: String? = null) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("chart_type", chartType)
             timeRange?.let { putString("time_range", it) }
@@ -121,6 +142,7 @@ class AnalyticsManager @Inject constructor(
 
     // Settings and preferences
     fun logSettingChanged(settingName: String, newValue: String) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("setting_name", settingName)
             putString("new_value", newValue)
@@ -129,6 +151,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logCurrencyChanged(oldCurrency: String, newCurrency: String) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("old_currency", oldCurrency)
             putString("new_currency", newCurrency)
@@ -138,6 +161,7 @@ class AnalyticsManager @Inject constructor(
 
     // Data management events
     fun logDataExport(exportFormat: String, recordCount: Int) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("export_format", exportFormat)
             putInt("record_count", recordCount)
@@ -146,6 +170,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logDataImport(importSource: String, recordCount: Int, success: Boolean) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("import_source", importSource)
             putInt("record_count", recordCount)
@@ -156,6 +181,7 @@ class AnalyticsManager @Inject constructor(
 
     // Error tracking (non-PII)
     fun logUserError(errorType: String, screenName: String, errorCode: String? = null) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("error_type", errorType)
             putString("screen_name", screenName)
@@ -166,6 +192,7 @@ class AnalyticsManager @Inject constructor(
 
     // Biometric authentication events
     fun logBiometricAuthAttempt(success: Boolean, errorReason: String? = null) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putBoolean("success", success)
             errorReason?.let { putString("error_reason", it) }
@@ -174,6 +201,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logBiometricAvailability(isAvailable: Boolean, deviceApiLevel: Int) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putBoolean("biometric_available", isAvailable)
             putInt("device_api_level", deviceApiLevel)
@@ -183,6 +211,7 @@ class AnalyticsManager @Inject constructor(
 
     // Database migration and integrity events
     fun logDatabaseMigration(fromVersion: Int, toVersion: Int, success: Boolean, recordCount: Int = 0) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putInt("from_version", fromVersion)
             putInt("to_version", toVersion)
@@ -193,6 +222,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logDatabaseIntegrityCheck(totalRecords: Int, validRecords: Int, isHealthy: Boolean) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putInt("total_records", totalRecords)
             putInt("valid_records", validRecords)
@@ -202,6 +232,7 @@ class AnalyticsManager @Inject constructor(
     }
 
     fun logDatabaseBackend(backend: String, encrypted: Boolean) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("backend_type", backend)
             putBoolean("encrypted", encrypted)
@@ -211,6 +242,7 @@ class AnalyticsManager @Inject constructor(
 
     // Chart error tracking
     fun logChartError(chartType: String, errorType: String, errorMessage: String? = null) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("chart_type", chartType)
             putString("error_type", errorType)
@@ -221,6 +253,7 @@ class AnalyticsManager @Inject constructor(
 
     // Feature usage tracking
     fun logFeatureUsed(featureName: String, context: String? = null) {
+        if (!isAnalyticsEnabled()) return
         val bundle = Bundle().apply {
             putString("feature_name", featureName)
             context?.let { putString("context", it) }

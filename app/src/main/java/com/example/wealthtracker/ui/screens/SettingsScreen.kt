@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.HorizontalDivider
@@ -45,8 +48,14 @@ fun SettingsScreen(
     onToggleRequireDeviceLock: () -> Unit,
     useHindiNumerals: Boolean,
     onToggleHindiNumerals: () -> Unit,
+    analyticsEnabled: Boolean = true,
+    onToggleAnalytics: (() -> Unit)? = null,
+    crashReportingEnabled: Boolean = true,
+    onToggleCrashReporting: (() -> Unit)? = null,
+    isPremium: Boolean = false,
     onBack: () -> Unit,
-    onOpenReferral: (() -> Unit)? = null
+    onOpenReferral: (() -> Unit)? = null,
+    onOpenPremium: (() -> Unit)? = null
 ) {
     Scaffold(
         topBar = {
@@ -71,6 +80,56 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Premium section
+            if (onOpenPremium != null) {
+                if (isPremium) {
+                    // Premium badge
+                    androidx.compose.material3.Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stars,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Premium Active",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                    }
+                } else {
+                    // Go Premium button
+                    androidx.compose.material3.Button(
+                        onClick = onOpenPremium,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Stars,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(8.dp))
+                        Text("Upgrade to Premium")
+                    }
+                }
+                HorizontalDivider()
+            }
+            
             SettingRow(
                 title = stringResource(id = R.string.toggle_dark_mode),
                 checked = darkMode,
@@ -102,6 +161,53 @@ fun SettingsScreen(
                 }
             )
             HorizontalDivider()
+            
+            // Privacy & Data section
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Privacy & Data",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
+            
+            if (onToggleAnalytics != null) {
+                SettingRow(
+                    title = "Usage Analytics",
+                    checked = analyticsEnabled,
+                    onToggle = {
+                        onToggleAnalytics()
+                        analytics.logSettingChanged("analytics_enabled", if (analyticsEnabled) "off" else "on")
+                    }
+                )
+                Text(
+                    "Help us improve the app by sharing anonymous usage data",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+            
+            if (onToggleCrashReporting != null) {
+                SettingRow(
+                    title = "Crash Reports",
+                    checked = crashReportingEnabled,
+                    onToggle = {
+                        onToggleCrashReporting()
+                        analytics.logSettingChanged("crash_reporting_enabled", if (crashReportingEnabled) "off" else "on")
+                    }
+                )
+                Text(
+                    "Automatically send crash reports to help us fix bugs faster",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+            
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
             
             // Referral section
             if (onOpenReferral != null) {

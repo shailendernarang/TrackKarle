@@ -103,6 +103,8 @@ import androidx.biometric.BiometricManager.Authenticators
 import androidx.core.content.ContextCompat
 import com.example.wealthtracker.ui.components.RatingPromptManager
 import com.example.wealthtracker.util.BiometricUtils
+import com.example.wealthtracker.ui.components.PrivacyConsentDialog
+import com.example.wealthtracker.ui.components.PrivacyPreferences
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -114,7 +116,7 @@ class MainActivity : AppCompatActivity() {
         
         // Initialize Appodeal SDK for ads
         Appodeal.setTesting(false) // Production mode - real ads
-        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.none) // silent in production
+        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.none) // Production - no verbose logging
         
         // Enable 728x90 banners for tablets (devices > 7 inches)
         Appodeal.set728x90Banners(true)
@@ -134,14 +136,14 @@ class MainActivity : AppCompatActivity() {
             object : ApdInitializationCallback {
                 override fun onInitializationFinished(errors: List<ApdInitializationError>?) {
                     val initResult = if (errors.isNullOrEmpty()) "successfully" else "with ${errors.size} errors"
-                    Log.d("Appodeal", "Initialized $initResult")
+                    Log.d("Appodeal", "✅ SDK Initialized $initResult")
                     errors?.forEach { error ->
-                        Log.e("Appodeal", "Init error: $error")
+                        Log.e("Appodeal", "❌ Init error: $error")
                     }
-                    // Explicitly start caching banner right after init so it's ready ASAP
-                    runOnUiThread {
-                        Appodeal.cache(this@MainActivity, Appodeal.BANNER)
-                    }
+                    // Auto-cache is enabled by default and optimal for banners
+                    // Banners auto-refresh every 15 seconds - no manual cache needed
+                    Log.d("Appodeal", "📊 Auto-cache enabled: ${Appodeal.isAutoCacheEnabled(Appodeal.BANNER)}")
+                    Log.d("Appodeal", "🔄 Shared instance enabled: ${Appodeal.isSharedAdsInstanceAcrossActivities()}")
                 }
             }
         )
@@ -149,11 +151,13 @@ class MainActivity : AppCompatActivity() {
         // Set banner callbacks for debugging
         Appodeal.setBannerCallbacks(object : com.appodeal.ads.BannerCallbacks {
             override fun onBannerLoaded(height: Int, isPrecache: Boolean) {
-                Log.d("Appodeal", "Banner loaded, height: $height, isPrecache: $isPrecache")
+                Log.d("Appodeal", "✅ Banner LOADED - height: $height, isPrecache: $isPrecache")
+                Log.d("Appodeal", "📊 Banner isLoaded: ${Appodeal.isLoaded(Appodeal.BANNER)}")
             }
             
             override fun onBannerFailedToLoad() {
-                Log.e("Appodeal", "Banner failed to load")
+                Log.e("Appodeal", "❌ Banner FAILED to load")
+                Log.e("Appodeal", "📊 SDK initialized: ${Appodeal.isInitialized(Appodeal.BANNER)}")
             }
             
             override fun onBannerShown() {
@@ -187,6 +191,11 @@ class MainActivity : AppCompatActivity() {
             var requireDeviceLock by remember { mutableStateOf(false) }
             var useHindiNumerals by remember { mutableStateOf(false) }
             var authenticated by remember { mutableStateOf(true) }
+            var showPrivacyConsent by remember { mutableStateOf(false) }
+            var analyticsEnabled by remember { mutableStateOf(true) }
+            var crashReportingEnabled by remember { mutableStateOf(true) }
+            var isPremium by remember { mutableStateOf(false) }
+            
             LaunchedEffect(Unit) {
                 // Load persisted settings
                 darkMode = SettingsStore.darkModeFlow(applicationContext).first()
@@ -198,6 +207,13 @@ class MainActivity : AppCompatActivity() {
                 FormatUtils.init(applicationContext)
                 
                 authenticated = !requireDeviceLock
+                
+                // Check if privacy consent has been given
+                showPrivacyConsent = !PrivacyPreferences.hasConsentBeenGiven(applicationContext)
+                
+                // Load privacy preferences
+                analyticsEnabled = PrivacyPreferences.isAnalyticsEnabled(applicationContext)
+                crashReportingEnabled = PrivacyPreferences.isCrashReportingEnabled(applicationContext)
             }
             val scope = rememberCoroutineScope()
             // Re-evaluate auth on toggle
@@ -220,6 +236,46 @@ class MainActivity : AppCompatActivity() {
                     val nav = rememberNavController()
                     val vm: InvestmentViewModel = hiltViewModel()
                     val userPrefs = remember { UserPreferences(this@MainActivity) }
+                    
+                    // Show Privacy Consent Dialog if not yet given
+                    if (showPrivacyConsent) {
+                        PrivacyConsentDialog(
+                            onAccept = { analyticsEnabled, crashReportingEnabled ->
+                                // Save consent preferences
+                                PrivacyPreferences.setConsentGiven(applicationContext, true)
+                                PrivacyPreferences.setAnalyticsEnabled(applicationContext, analyticsEnabled)
+                                PrivacyPreferences.setCrashReportingEnabled(applicationContext, crashReportingEnabled)
+                                
+                                // Enable/disable Firebase Analytics
+                                com.google.firebase.analytics.FirebaseAnalytics.getInstance(applicationContext)
+                                    .setAnalyticsCollectionEnabled(analyticsEnabled)
+                                
+                                // Enable/disable Crashlytics
+                                FirebaseCrashlytics.getInstance()
+                                    .setCrashlyticsCollectionEnabled(crashReportingEnabled)
+                                
+                                showPrivacyConsent = false
+                                Log.d("Privacy", "Consent accepted - Analytics: $analyticsEnabled, Crashlytics: $crashReportingEnabled")
+                            },
+                            onDecline = {
+                                // User declined all tracking
+                                PrivacyPreferences.setConsentGiven(applicationContext, true)
+                                PrivacyPreferences.setAnalyticsEnabled(applicationContext, false)
+                                PrivacyPreferences.setCrashReportingEnabled(applicationContext, false)
+                                
+                                // Disable Firebase Analytics
+                                com.google.firebase.analytics.FirebaseAnalytics.getInstance(applicationContext)
+                                    .setAnalyticsCollectionEnabled(false)
+                                
+                                // Disable Crashlytics
+                                FirebaseCrashlytics.getInstance()
+                                    .setCrashlyticsCollectionEnabled(false)
+                                
+                                showPrivacyConsent = false
+                                Log.d("Privacy", "Consent declined - All tracking disabled")
+                            }
+                        )
+                    }
                     
                     androidx.compose.animation.Crossfade(
                         targetState = showComposeSplash,
@@ -406,8 +462,26 @@ class MainActivity : AppCompatActivity() {
                                             scope.launch { com.example.wealthtracker.data.SettingsStore.setHindiNumerals(applicationContext, useHindiNumerals) }
                                             pendingLocaleTag = if (useHindiNumerals) "hi-IN" else "en-IN"
                                         },
+                                        analyticsEnabled = analyticsEnabled,
+                                        onToggleAnalytics = {
+                                            analyticsEnabled = !analyticsEnabled
+                                            PrivacyPreferences.setAnalyticsEnabled(applicationContext, analyticsEnabled)
+                                            com.google.firebase.analytics.FirebaseAnalytics.getInstance(applicationContext)
+                                                .setAnalyticsCollectionEnabled(analyticsEnabled)
+                                            Log.d("Privacy", "Analytics ${if (analyticsEnabled) "enabled" else "disabled"}")
+                                        },
+                                        crashReportingEnabled = crashReportingEnabled,
+                                        onToggleCrashReporting = {
+                                            crashReportingEnabled = !crashReportingEnabled
+                                            PrivacyPreferences.setCrashReportingEnabled(applicationContext, crashReportingEnabled)
+                                            FirebaseCrashlytics.getInstance()
+                                                .setCrashlyticsCollectionEnabled(crashReportingEnabled)
+                                            Log.d("Privacy", "Crash reporting ${if (crashReportingEnabled) "enabled" else "disabled"}")
+                                        },
+                                        isPremium = isPremium,
                                         onBack = { nav.popBackStack() },
-                                        onOpenReferral = { nav.navigate("referral") }
+                                        onOpenReferral = { nav.navigate("referral") },
+                                        onOpenPremium = { nav.navigate("premium") }
                                     )
                                 }
                                 composable(
@@ -443,6 +517,17 @@ class MainActivity : AppCompatActivity() {
                                         onRemindLater = { reminderManager.snoozeReminder(it.id) },
                                         onDismiss = { reminderManager.archiveReminder(it.id) },
                                         onReactivate = { reminderManager.reactivateReminder(it.id) },
+                                        onBack = { nav.popBackStack() }
+                                    )
+                                }
+                                composable(
+                                    "premium",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
+                                    com.example.wealthtracker.ui.screens.PremiumScreen(
                                         onBack = { nav.popBackStack() }
                                     )
                                 }
