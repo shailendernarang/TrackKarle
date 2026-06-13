@@ -1,6 +1,9 @@
 package com.example.wealthtracker.ui.screens
 
+import android.app.Activity
 import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -675,7 +678,9 @@ fun InvestmentScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Appodeal banner ad
+                        val view = LocalView.current
                         AppodealBanner(
+                            activity = view.context as Activity,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(90.dp)

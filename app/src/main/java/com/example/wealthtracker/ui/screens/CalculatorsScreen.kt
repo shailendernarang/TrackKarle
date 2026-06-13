@@ -1,5 +1,7 @@
 package com.example.wealthtracker.ui.screens
 
+import android.app.Activity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -107,7 +109,9 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
         ) {
             val ctx = LocalContext.current
             // Appodeal banner ad
+            val view = LocalView.current
             AppodealBanner(
+                activity = view.context as Activity,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(90.dp)
