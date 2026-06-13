@@ -1,0 +1,65 @@
+<resources>
+    <string name="app_name">TrackKaro</string>
+    <string name="share_csv">CSV साझा करें</string>
+    <string name="share_pdf">PDF साझा करें</string>
+    <string name="require_device_lock_on">डिवाइस लॉक आवश्यक: चालू</string>
+    <string name="require_device_lock_off">डिवाइस लॉक आवश्यक: बंद</string>
+    <string name="toggle_dark_mode">डार्क मोड बदलें</string>
+    <string name="hindi_numerals_on">हिंदी अंक: चालू</string>
+    <string name="hindi_numerals_off">हिंदी अंक: बंद</string>
+    <string name="backup_encrypted">बैकअप (एन्क्रिप्टेड)</string>
+    <string name="restore_encrypted">रीस्टोर (एन्क्रिप्टेड)</string>
+    <string name="snackbar_deleted">हटा दिया गया</string>
+    <string name="action_undo">पूर्ववत</string>
+    <string name="backup_saved_encrypted">बैकअप सहेजा गया (एन्क्रिप्टेड)</string>
+    <string name="backup_failed">बैकअप असफल</string>
+    <string name="restore_complete">रीस्टोर पूरा</string>
+    <string name="restore_failed">रीस्टोर असफल</string>
+    <string name="settings">सेटिंग्स</string>
+    <string name="settings_on">चालू</string>
+    <string name="settings_off">बंद</string>
+    <!-- Investment/Dashboard UI -->
+    <string name="title_investments">निवेश</string>
+    <string name="subtitle_investments">अपने निवेश ट्रैक करें</string>
+    <string name="cta_view_dashboard">डैशबोर्ड देखें</string>
+    <string name="cta_calculators">कैलकुलेटर</string>
+    <string name="label_total_investment">कुल निवेश</string>
+    <string name="label_total_investment_count">कुल निवेश संख्या</string>
+    <string name="section_your_investments">आपके निवेश</string>
+    <string name="empty_no_investments">अभी कोई निवेश नहीं</string>
+    <string name="btn_add_investment">निवेश जोड़ें</string>
+    <string name="btn_delete_all">सब हटाएँ</string>
+    <string name="label_amount">राशि (₹)</string>
+    <string name="hint_investment_name">उदा॰ US स्टॉक्स, क्रिप्टो, बॉन्ड्स</string>
+    <string name="label_investment_type">निवेश प्रकार</string>
+    <string name="label_bank">बैंक</string>
+    <string name="bank_select">बैंक चुनें</string>
+    <string name="menu_others">अन्य</string>
+    <string name="name_investment">निवेश का नाम</string>
+    <string name="error_enter_valid_amount">कृपया 0 से अधिक मान्य राशि दर्ज करें</string>
+    <string name="error_select_bank_fd">फिक्स्ड डिपॉजिट के लिए बैंक चुनें</string>
+    <string name="error_enter_name_others">अन्य के लिए निवेश का नाम दर्ज करें</string>
+    <string name="dlg_title_edit_investment">निवेश संपादित करें</string>
+    <string name="action_save">सहेजें</string>
+    <string name="action_cancel">रद्द करें</string>
+    <!-- Shared labels -->
+    <string name="fixed_deposit">फिक्स्ड डिपॉजिट</string>
+    <!-- Dashboard -->
+    <string name="title_dashboard">आपका डैशबोर्ड</string>
+    <string name="cta_view_investments">निवेश देखें</string>
+    <string name="privacy_tagline">प्राइवेट • बिना क्लाउड सिंक • ऑफलाइन</string>
+    <string name="label_total_amount">कुल राशि</string>
+    <string name="label_investments">निवेश</string>
+    <string name="recent_investments">हाल के निवेश</string>
+    <string name="compare_fd_rates">FD दरें तुलना करें</string>
+    <string name="fd_rates_source">स्रोत: बैंक वेबसाइटें (नमूना) — नवीनतम दरों के लिए बैंकों की साइट देखें</string>
+    <!-- Visualization -->
+    <string name="overall_allocation">कुल आवंटन</string>
+    <string name="viz_pie">पाई</string>
+    <string name="viz_bar">बार</string>
+    <string name="no_data_to_visualize">दिखाने के लिए डेटा नहीं</string>
+    <string name="unknown_bank">अज्ञात बैंक</string>
+    <!-- Widget -->
+    <string name="widget_description">होम स्क्रीन पर आपका पोर्टफोलियो सारांश दिखाता है</string>
+    <string name="change_language_hindi">हिंदी भाषा में बदलें</string>
+</resources>

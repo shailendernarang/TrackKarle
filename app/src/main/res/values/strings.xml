@@ -1,4 +1,66 @@
 <resources>
-    <string name="app_name">TrackKarle</string>
-    <string name="admob_app_id">ca-app-pub-4934815537317220~2068436773</string>
+    <string name="app_name">TrackKaro</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4934815537317220~2068436773</string>
+    <string name="share_csv">Share CSV</string>
+    <string name="share_pdf">Share PDF</string>
+    <string name="require_device_lock_on">Require device lock: On</string>
+    <string name="require_device_lock_off">Require device lock: Off</string>
+    <string name="hindi_numerals_on">Hindi numerals: On</string>
+    <string name="hindi_numerals_off">Hindi numerals: Off</string>
+    <string name="toggle_dark_mode">Toggle Dark Mode</string>
+    <string name="change_language_hindi">Change language to Hindi</string>
+    <string name="backup_encrypted">Backup (encrypted)</string>
+    <string name="restore_encrypted">Restore (encrypted)</string>
+    <string name="snackbar_deleted">Deleted</string>
+    <string name="action_undo">Undo</string>
+    <string name="backup_saved_encrypted">Backup saved (encrypted)</string>
+    <string name="backup_failed">Backup failed</string>
+    <string name="restore_complete">Restore complete</string>
+    <string name="restore_failed">Restore failed</string>
+    <string name="settings">Settings</string>
+    <string name="settings_on">On</string>
+    <string name="settings_off">Off</string>
+    <!-- Investment/Dashboard UI -->
+    <string name="title_investments">Investments</string>
+    <string name="subtitle_investments">Track your investments</string>
+    <string name="cta_view_dashboard">View Dashboard</string>
+    <string name="cta_calculators">Calculators</string>
+    <string name="label_total_investment">Total Investment</string>
+    <string name="label_total_investment_count">Total Investment Count</string>
+    <string name="section_your_investments">Your investments</string>
+    <string name="empty_no_investments">No investments yet</string>
+    <string name="btn_add_investment">Add Investment</string>
+    <string name="btn_delete_all">Delete All</string>
+    <string name="label_amount">Amount (₹)</string>
+    <string name="hint_investment_name">e.g., US Stocks, Crypto, Bonds</string>
+    <string name="label_investment_type">Investment Type</string>
+    <string name="label_bank">Bank</string>
+    <string name="bank_select">Select Bank</string>
+    <string name="menu_others">Others</string>
+    <string name="name_investment">Investment Name</string>
+    <string name="error_enter_valid_amount">Enter a valid amount greater than 0</string>
+    <string name="error_select_bank_fd">Select a bank for Fixed Deposit</string>
+    <string name="error_enter_name_others">Please enter an investment name for Others</string>
+    <string name="dlg_title_edit_investment">Edit Investment</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <!-- Shared labels -->
+    <string name="fixed_deposit">Fixed Deposit</string>
+    <!-- Dashboard -->
+    <string name="title_dashboard">Your Dashboard</string>
+    <string name="cta_view_investments">View Investments</string>
+    <string name="privacy_tagline">Private • No cloud sync • Offline</string>
+    <string name="label_total_amount">Total Amount</string>
+    <string name="label_investments">Investments</string>
+    <string name="recent_investments">Recent investments</string>
+    <string name="compare_fd_rates">Compare FD Rates</string>
+    <string name="fd_rates_source">Source: Bank websites (sample) — see bank sites for latest rates</string>
+    <!-- Visualization -->
+    <string name="overall_allocation">Overall Allocation</string>
+    <string name="viz_pie">Pie</string>
+    <string name="viz_bar">Bar</string>
+    <string name="no_data_to_visualize">No data to visualize</string>
+    <string name="unknown_bank">Unknown Bank</string>
+    <!-- Widget -->
+    <string name="widget_description">Shows your portfolio summary on home screen</string>
 </resources>

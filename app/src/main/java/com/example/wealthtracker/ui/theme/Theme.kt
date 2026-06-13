@@ -14,25 +14,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF4CAF50),
+    primary = Color(0xFF66BB6A),
     secondary = Color(0xFF81C784),
-    tertiary = Color(0xFFA5D6A7)
+    tertiary = Color(0xFFA5D6A7),
+    surface = Color(0xFF121212),
+    onSurface = Color(0xFFE5E5E5),
+    surfaceVariant = Color(0xFF1E1F1E),
+    onSurfaceVariant = Color(0xFFB9C2BA)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = Color(0xFF2E7D32),
     secondary = Color(0xFF4CAF50),
     tertiary = Color(0xFF81C784),
-    background = Color(0xFFF5F5F5),
-    surface = Color.White,
+    background = Color(0xFFF5F6F5),
+    surface = Color(0xFFFFFFFF),
     onPrimary = Color.White,
     onSecondary = Color.White,
     onTertiary = Color.White,
     onBackground = Color(0xFF1C1B1F),
     onSurface = Color(0xFF1C1B1F),
+    surfaceVariant = Color(0xFFE7EFE8),
+    onSurfaceVariant = Color(0xFF4D6356)
 )
 
 @Composable
@@ -58,9 +65,13 @@ fun WealthTrackerTheme(
         }
     }
 
+    val cfg = LocalConfiguration.current
+    val isCompact = cfg.screenWidthDp < 600
+    val typeScale = if (isCompact) CompactTypography else Typography
+
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = typeScale,
         content = content
     )
 }

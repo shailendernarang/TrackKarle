@@ -1,0 +1,273 @@
+package com.example.wealthtracker.billing
+
+import android.app.Activity
+import android.content.Context
+import android.util.Log
+import com.android.billingclient.api.*
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Billing Manager for Google Play In-App Purchases
+ * 
+ * Manages Premium subscription and one-time purchases:
+ * - Monthly subscription (₹99/month)
+ * - Yearly subscription (₹999/year) 
+ * - Lifetime purchase (₹2999 one-time)
+ */
+@Singleton
+class BillingManager @Inject constructor(
+    @ApplicationContext private val context: Context
+) : PurchasesUpdatedListener {
+    
+    companion object {
+        private const val TAG = "BillingManager"
+        
+        // Product IDs (must match Google Play Console)
+        const val PRODUCT_PREMIUM_MONTHLY = "premium_monthly"
+        const val PRODUCT_PREMIUM_YEARLY = "premium_yearly"
+        const val PRODUCT_PREMIUM_LIFETIME = "premium_lifetime"
+    }
+    
+    private var billingClient: BillingClient? = null
+    
+    // Premium status
+    private val _isPremium = MutableStateFlow(false)
+    val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
+    
+    // Available products
+    private val _products = MutableStateFlow<List<ProductDetails>>(emptyList())
+    val products: StateFlow<List<ProductDetails>> = _products.asStateFlow()
+    
+    // Billing connection state
+    private val _isReady = MutableStateFlow(false)
+    val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
+    
+    init {
+        initializeBillingClient()
+    }
+    
+    private fun initializeBillingClient() {
+        billingClient = BillingClient.newBuilder(context)
+            .setListener(this)
+            .enablePendingPurchases()
+            .build()
+        
+        connectToBillingService()
+    }
+    
+    private fun connectToBillingService() {
+        billingClient?.startConnection(object : BillingClientStateListener {
+            override fun onBillingSetupFinished(billingResult: BillingResult) {
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    Log.d(TAG, "Billing client connected")
+                    _isReady.value = true
+                    
+                    // Query products and purchases
+                    queryProducts()
+                    queryPurchases()
+                } else {
+                    Log.e(TAG, "Billing setup failed: ${billingResult.debugMessage}")
+                    _isReady.value = false
+                }
+            }
+            
+            override fun onBillingServiceDisconnected() {
+                Log.w(TAG, "Billing service disconnected")
+                _isReady.value = false
+                // Retry connection
+                connectToBillingService()
+            }
+        })
+    }
+    
+    private fun queryProducts() {
+        val productList = listOf(
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(PRODUCT_PREMIUM_MONTHLY)
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build(),
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(PRODUCT_PREMIUM_YEARLY)
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build(),
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(PRODUCT_PREMIUM_LIFETIME)
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        )
+        
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(productList)
+            .build()
+        
+        billingClient?.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                _products.value = productDetailsList
+                Log.d(TAG, "Products loaded: ${productDetailsList.size}")
+            } else {
+                Log.e(TAG, "Failed to query products: ${billingResult.debugMessage}")
+            }
+        }
+    }
+    
+    private fun queryPurchases() {
+        // Query subscriptions
+        billingClient?.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build()
+        ) { billingResult, purchases ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                handlePurchases(purchases)
+            }
+        }
+        
+        // Query one-time purchases
+        billingClient?.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        ) { billingResult, purchases ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                handlePurchases(purchases)
+            }
+        }
+    }
+    
+    private fun handlePurchases(purchases: List<Purchase>) {
+        var hasPremium = false
+        
+        for (purchase in purchases) {
+            if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
+                // Verify purchase
+                if (!purchase.isAcknowledged) {
+                    acknowledgePurchase(purchase)
+                }
+                
+                // Check if it's a premium product
+                if (purchase.products.any { 
+                    it == PRODUCT_PREMIUM_MONTHLY || 
+                    it == PRODUCT_PREMIUM_YEARLY || 
+                    it == PRODUCT_PREMIUM_LIFETIME 
+                }) {
+                    hasPremium = true
+                }
+            }
+        }
+        
+        _isPremium.value = hasPremium
+        Log.d(TAG, "Premium status: $hasPremium")
+    }
+    
+    private fun acknowledgePurchase(purchase: Purchase) {
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken)
+            .build()
+        
+        billingClient?.acknowledgePurchase(params) { billingResult ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                Log.d(TAG, "Purchase acknowledged")
+            }
+        }
+    }
+    
+    /**
+     * Launch purchase flow for a product
+     */
+    fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails) {
+        val productDetailsParamsList = listOf(
+            BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(productDetails)
+                .apply {
+                    // For subscriptions, select the base plan
+                    productDetails.subscriptionOfferDetails?.firstOrNull()?.let { offer ->
+                        setOfferToken(offer.offerToken)
+                    }
+                }
+                .build()
+        )
+        
+        val billingFlowParams = BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(productDetailsParamsList)
+            .build()
+        
+        billingClient?.launchBillingFlow(activity, billingFlowParams)
+    }
+    
+    override fun onPurchasesUpdated(
+        billingResult: BillingResult,
+        purchases: List<Purchase>?
+    ) {
+        if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
+            handlePurchases(purchases)
+        } else if (billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
+            Log.d(TAG, "User canceled purchase")
+        } else {
+            Log.e(TAG, "Purchase failed: ${billingResult.debugMessage}")
+        }
+    }
+    
+    /**
+     * Restore purchases (useful for reinstalls)
+     */
+    fun restorePurchases() {
+        queryPurchases()
+    }
+    
+    fun cleanup() {
+        billingClient?.endConnection()
+    }
+}
+
+/**
+ * Premium Features Manager
+ * Checks if specific features are available based on premium status
+ */
+object PremiumFeatures {
+    
+    /**
+     * Features available only to premium users
+     */
+    enum class Feature {
+        AD_FREE,              // No ads
+        CLOUD_SYNC,           // Cloud backup & sync
+        UNLIMITED_EXPORTS,    // Unlimited CSV/PDF exports
+        FAMILY_ACCOUNTS,      // Up to 5 family members
+        ADVANCED_ANALYTICS,   // XIRR, sector analysis
+        PRICE_ALERTS,         // Unlimited price alerts
+        AI_INSIGHTS,          // AI-powered insights
+        PRIORITY_SUPPORT      // Email support
+    }
+    
+    /**
+     * Check if a feature is available
+     */
+    fun isFeatureAvailable(feature: Feature, isPremium: Boolean): Boolean {
+        return when (feature) {
+            Feature.AD_FREE -> isPremium
+            Feature.CLOUD_SYNC -> isPremium
+            Feature.UNLIMITED_EXPORTS -> isPremium
+            Feature.FAMILY_ACCOUNTS -> isPremium
+            Feature.ADVANCED_ANALYTICS -> isPremium
+            Feature.PRICE_ALERTS -> isPremium
+            Feature.AI_INSIGHTS -> isPremium
+            Feature.PRIORITY_SUPPORT -> isPremium
+        }
+    }
+    
+    /**
+     * Get feature limit for free users
+     */
+    fun getFeatureLimit(feature: Feature): Int? {
+        return when (feature) {
+            Feature.PRICE_ALERTS -> 5 // Free users get 5 alerts
+            Feature.UNLIMITED_EXPORTS -> 10 // Free users get 10 exports/month
+            else -> null // No limit or not applicable
+        }
+    }
+}

@@ -10,5 +10,27 @@ data class InvestmentEntity(
     val amount: Double,
     val createdAt: Long = System.currentTimeMillis(),
     val investmentType: String = "Others",
-    val bankName: String? = null
+    val bankName: String? = null,
+    // FD
+    val fdStartDate: String? = null,
+    val fdMaturityDate: String? = null,
+    val fdRate: Double? = null,
+    val fdTenure: String? = null,
+    // Mutual Fund
+    val mfDate: String? = null,
+    // PPF
+    val ppfFy: String? = null,
+    val ppfDate: String? = null,
+    // NPS
+    val npsTier: String? = null,
+    val npsDate: String? = null,
+    // Gold
+    val goldType: String? = null,
+    val goldDate: String? = null,
+    // Health Insurance
+    val hiPolicyName: String? = null,
+    val hiRenewalDate: String? = null,
+    // Stocks
+    val stockName: String? = null,
+    val stockDate: String? = null
 )

@@ -1,0 +1,93 @@
+TrackKarle – Privacy Policy (Text Version)
+Last updated: 19 Mar 2026
+
+This Privacy Policy explains how TrackKarle ("the App", "we", "our", or "us") collects, uses, and shares information when you use the App.
+
+App name: TrackKarle
+Package: com.ss.wealthtracker
+Advertising: Appodeal (ad mediation platform serving ads from multiple networks)
+
+1) Information We Collect
+- No account or personal profile is required by the App.
+- Local-only app data: your investments and settings are stored on your device. We do not operate servers to receive or store your content.
+- Platform/diagnostic data: Google Play and/or your device OS may collect limited diagnostic information per their policies (e.g., crash logs, ANRs, app version).
+- Advertising data (via Appodeal SDK): device information such as IP address, Advertising ID, approximate location (derived from IP), device type and operating system, app interactions (ad impressions/clicks), and other signals necessary for ad delivery, measurement, and fraud prevention.
+
+2) Advertising (Appodeal)
+- The App displays banner ads using Appodeal, an ad mediation platform that works with multiple advertising networks.
+- Appodeal and its partner networks may process data for ad delivery, personalization, measurement, and fraud prevention.
+- Appodeal Privacy Policy: https://www.appodeal.com/privacy-policy
+
+Ad Networks Used Through Appodeal:
+The following advertising networks may serve ads in our app. Each has its own privacy policy:
+  • Meta Audience Network (Facebook): https://www.facebook.com/privacy/policy
+  • AppLovin: https://www.applovin.com/privacy/
+  • Unity Ads: https://unity.com/legal/privacy-policy
+  • InMobi: https://www.inmobi.com/privacy-policy/
+  • BidMachine: https://bidmachine.io/privacy-policy/
+  • And other advertising partners as listed in Appodeal's privacy policy
+
+Data Collected by Advertising Networks:
+  • Advertising ID (a unique, user-resettable identifier)
+  • IP Address
+  • Device information (type, OS version)
+  • App usage and interaction data
+  • Approximate location (based on IP address)
+
+3) Children’s Privacy
+- The App is not directed to children under 13 (or under the age required by local law, e.g., 16 in the EEA/UK). We do not knowingly collect personal information from children.
+- If you believe we have collected information from a child, contact us so we can take appropriate action.
+
+4) Permissions Used
+- INTERNET: required for loading ads and fetching external content such as news feeds.
+- ACCESS_NETWORK_STATE: used to check network connectivity for ads and content fetching.
+- Any additional permissions added in future releases will be disclosed in the Play listing and reflected in this policy.
+
+5) Data Storage and Security
+- Your financial data (e.g., investments, settings) is stored locally on your device (e.g., Room database or SharedPreferences).
+- We recommend using a device screen lock and keeping your OS/apps updated for maximum security.
+
+6) Data Retention
+- Local app data remains on your device until you delete it or uninstall the App.
+- Ad-related data is processed and retained by Appodeal and its advertising partners in accordance with their respective privacy policies (see links above).
+
+7) Your Choices and Controls
+Opt-Out of Personalized Advertising:
+- Android: Go to Settings > Google > Ads > Enable "Opt out of Ads Personalization"
+- iOS: Go to Settings > Privacy > Advertising > Enable "Limit Ad Tracking"
+
+Reset Your Advertising ID:
+- Android: Settings > Google > Ads > Reset advertising ID
+- iOS: Settings > Privacy > Advertising > Reset Advertising Identifier
+
+Additional Controls:
+- Manage Google ad settings at: https://adssettings.google.com
+- If required by law (e.g., EEA/UK), a consent dialog may request your consent for personalized ads. You can revisit and change preferences through that consent dialog when shown.
+- To stop all data collection, uninstall the App.
+
+8) Your Rights (GDPR/EEA/UK)
+- Where applicable, you may have rights to: access, rectify, erase, restrict or object to processing of your personal data, and data portability.
+- To exercise your rights regarding data processed by Appodeal and advertising partners, use the privacy tools/links provided above and contact the respective companies as described in their policies. For App-local data, you can delete data or uninstall the App. You may also contact us (see Contact Us).
+
+9) California Privacy (CCPA/CPRA)
+- We do not sell or share personal information as defined by CCPA/CPRA.
+- You may limit ad personalization in Android settings and via applicable consent dialogs.
+- To exercise rights under CCPA/CPRA, contact us (see Contact Us) and use Google’s privacy tools referenced above.
+
+10) Third-Party SDKs
+- Appodeal SDK (ad mediation platform)
+- Appodeal integrates with multiple advertising network SDKs including Meta Audience Network, AppLovin, Unity Ads, InMobi, BidMachine, and others
+- Firebase SDK (for analytics and performance monitoring)
+- If we add more SDKs in future, we will update this section.
+
+11) International Users
+- Ad services (Appodeal and its partner networks) may process data on servers worldwide. Your information may be transferred to and processed in countries outside your own.
+
+12) Changes to This Policy
+- We may update this Privacy Policy to reflect changes in the App, SDKs, or legal requirements. The “Last updated” date indicates the latest revision.
+
+13) Contact Us
+TrackKarle
+Shailender Narang
+shailendernarang2+trackkarle@gmail.com
+India

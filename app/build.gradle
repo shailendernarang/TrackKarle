@@ -4,6 +4,9 @@ plugins {
     id 'kotlin-kapt'
     id 'dagger.hilt.android.plugin'
     id 'org.jetbrains.kotlin.plugin.compose'
+    id 'com.google.gms.google-services'
+    id 'com.google.firebase.crashlytics'
+    id 'com.google.firebase.firebase-perf'
 }
 
 def keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -12,21 +15,51 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def localPropertiesFile = rootProject.file("local.properties")
+def localProperties = new Properties()
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
+}
+
+configurations.all {
+    resolutionStrategy {
+        // Security: Force secure versions to fix CVEs in transitive dependencies
+        force 'com.google.code.gson:gson:2.11.0'
+        force 'commons-io:commons-io:2.18.0'
+        // Note: Protobuf versions managed by Firebase BoM to avoid conflicts with protolite
+        force 'org.jdom:jdom2:2.0.6.1'
+        force 'org.bitbucket.b_c:jose4j:0.9.6'
+        // Netty: HTTP/2 Rapid Reset (CVE-2023-44487) and other vulnerabilities fixed in 4.1.100+
+        force 'io.netty:netty-handler:4.1.118.Final'
+        force 'io.netty:netty-codec-http2:4.1.118.Final'
+        // OkHttp: HTTP/2 client with latest security patches (Rapid Reset, MadeYouReset mitigations)
+        // Note: HTTP/2 server vulnerabilities don't affect client-only usage
+        force 'com.squareup.okhttp3:okhttp:4.12.0'
+        force 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    }
+}
+
 android {
-    namespace 'com.example.wealthtracker'
-    compileSdk 34
+    namespace 'com.ss.wealthtracker'
+    compileSdk 35
 
     defaultConfig {
-        applicationId "com.example.wealthtracker"
+        applicationId "com.ss.wealthtracker"
         minSdk 24
-        targetSdk 34
-        versionCode 279000
-        versionName "27.9.0"
+        targetSdk 35
+        versionCode 2711000
+        versionName "27.11.0"
+
+        buildConfigField 'String', 'RATES_URL', '"https://api.example.com/wealthtracker/avg_rates.json"'
+        buildConfigField 'String', 'APPODEAL_API_KEY', '"' + (localProperties['appodeal.api.key'] ?: '') + '"'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
         }
+        ndk {
+        abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
+    }
     }
 
     signingConfigs {
@@ -39,30 +72,49 @@ android {
             }
         }
     }
+    flavorDimensions "dist"
+    productFlavors {
+        secure {
+            dimension "dist"
+        }
+        play {
+            dimension "dist"
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            shrinkResources false
+            debuggable false
+            // ProGuard disabled - rules were too conservative to provide benefit
+            // proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
+            }
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false  // No mapping file when ProGuard is disabled
             }
         }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = '17'
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
     // Compose Compiler is provided by the Kotlin Compose plugin (no composeOptions needed)
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
+        // Do not bundle a private libsqlite; rely on system SQLite in Play builds
+        exclude 'lib/**/libsqlite.so'
     }
 }
 
@@ -71,9 +123,12 @@ kapt {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    // Charts - using MPAndroidChart for reliability
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     // Core Android
     implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
     implementation 'androidx.activity:activity-compose:1.9.3'
     
@@ -83,7 +138,6 @@ dependencies {
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.foundation:foundation'
-    implementation 'androidx.compose.foundation:foundation-layout'
     implementation 'androidx.compose.material3:material3'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.compose.material:material-icons-extended'
@@ -106,22 +160,61 @@ dependencies {
     // Retrofit for API calls
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    // Pin Gson to a safe version (addresses CVE for <2.8.9)
+    implementation 'com.google.code.gson:gson:2.11.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     
     // Coil for image loading
     implementation 'io.coil-kt:coil-compose:2.5.0'
+    implementation 'io.coil-kt:coil-svg:2.5.0'
 
     // Lottie for animations
     implementation 'com.airbnb.android:lottie-compose:6.0.1'
 
-    // Google Mobile Ads SDK (AdMob)
-    implementation 'com.google.android.gms:play-services-ads:24.7.0'
+    // Appodeal Ads SDK (includes built-in CMP for GDPR consent)
+    implementation 'com.appodeal.ads.sdk:core:4.0.0'
+    
+    // Appodeal Network Adapters (AdMob removed - account banned)
+    implementation 'com.appodeal.ads.sdk.adapters:applovin:13.5.1.0'
+    implementation 'com.appodeal.ads.sdk.adapters:bidmachine:3.5.0.0'
+    implementation 'com.appodeal.ads.sdk.adapters:meta:6.20.0.0'
+    implementation 'com.appodeal.ads.sdk.adapters:unity_ads:4.16.4.0'
+    implementation 'com.appodeal.ads.sdk.adapters:inmobi:11.1.0.0'
+    implementation 'com.appodeal.ads.sdk.adapters:iab:1.8.1.0'
+    implementation 'com.appodeal.ads.sdk.adapters:bidon:0.13.0.0'
+    implementation 'com.appodeal.ads.sdk.adapters:yandex:7.18.2.0'
+
+    // Firebase (BOM pinned to latest stable to pick security fixes)
+    implementation platform('com.google.firebase:firebase-bom:33.16.0')
+    implementation 'com.google.firebase:firebase-messaging-ktx'
+    implementation 'com.google.firebase:firebase-crashlytics-ktx'
+    implementation 'com.google.firebase:firebase-analytics-ktx'
+    implementation 'com.google.firebase:firebase-perf-ktx'
 
     // Android 12+ splash screen API (backports behavior)
     implementation 'androidx.core:core-splashscreen:1.0.1'
+    // Encrypted storage and biometrics for optional device-lock-gated backups
+    implementation 'androidx.security:security-crypto:1.1.0'
+    implementation 'androidx.biometric:biometric:1.2.0-alpha05'
+    // DataStore for persisting app settings
+    implementation 'androidx.datastore:datastore-preferences:1.1.1'
+    // SQLCipher for Room encryption at rest (only in secure flavor)
+    secureImplementation 'net.zetetic:android-database-sqlcipher:4.5.4'
+    
+    // Google Play Billing for in-app purchases and subscriptions
+    implementation 'com.android.billingclient:billing-ktx:7.1.1'
     
     // Testing
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test:1.9.20'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
+    testImplementation 'org.mockito:mockito-core:5.7.0'
+    testImplementation 'org.mockito:mockito-inline:5.2.0'
+    testImplementation 'org.mockito.kotlin:mockito-kotlin:5.1.0'
+    testImplementation 'androidx.arch.core:core-testing:2.2.0'
+    testImplementation "androidx.room:room-testing:2.7.0"
+    androidTestImplementation 'androidx.test:core:1.5.0'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     androidTestImplementation platform('androidx.compose:compose-bom:2024.10.00')

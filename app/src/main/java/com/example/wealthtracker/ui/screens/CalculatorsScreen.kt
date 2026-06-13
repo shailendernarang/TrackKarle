@@ -1,6 +1,12 @@
 package com.example.wealthtracker.ui.screens
 
+import android.app.Activity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -12,25 +18,25 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.example.wealthtracker.R
-import com.google.android.gms.ads.AdSize
+import com.ss.wealthtracker.R
+import com.example.wealthtracker.ui.components.AppodealBanner
 import kotlin.math.pow
 
 // ------------------------ DATA + HELPERS ------------------------
 
-private data class FdRateRow(val bank: String, val tenure: String, val nonSeniorRate: Double, val seniorRate: Double)
+data class FdRateRow(val bank: String, val tenure: String, val nonSeniorRate: Double, val seniorRate: Double)
 
 private fun loadFdRates(ctx: android.content.Context): List<FdRateRow> {
     return runCatching {
@@ -70,10 +76,11 @@ private val TENURE_ORDER = listOf("1y", "1y 4m", "1y 6m", "2y", "3y", "5y")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showBack: Boolean = true) {
-    val tabs = listOf("SIP", "Lumpsum", "FD", "PPF/EPF")
+    val tabs = listOf("FD", "SIP", "Lump- Sum", "PPF/EPF")
     val initialIndex = when (initialTab?.lowercase()) {
-        "fd" -> 2
-        "lumpsum" -> 1
+        "fd" -> 0
+        "sip" -> 1
+        "lumpsum", "lump-sum", "lump- sum" -> 2
         "ppf", "epf" -> 3
         else -> 0
     }
@@ -87,7 +94,7 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.Calculate, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     }
                 }
@@ -100,23 +107,14 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 .padding(inner)
                 .padding(16.dp)
         ) {
-            // AdMob Adaptive Anchored banner at top
             val ctx = LocalContext.current
-            val dm = ctx.resources.displayMetrics
-            val adWidthDp = (dm.widthPixels / dm.density).toInt()
-            val adaptiveSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp)
-            val adaptiveHeightDp = adaptiveSize.getHeightInPixels(ctx) / dm.density
-            AndroidView(
-                factory = { context ->
-                    com.google.android.gms.ads.AdView(context).apply {
-                        setAdSize(adaptiveSize)
-                        adUnitId = "ca-app-pub-4934815537317220/1418248826"
-                        loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
-                    }
-                },
+            // Appodeal banner ad
+            val view = LocalView.current
+            AppodealBanner(
+                activity = view.context as Activity,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(adaptiveHeightDp.dp)
+                    .height(90.dp)
             )
             Spacer(Modifier.height(8.dp))
             TabRow(selectedTabIndex = pagerState.currentPage) {
@@ -129,15 +127,18 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 }
             }
             Spacer(Modifier.height(12.dp))
-
-            Box(Modifier.fillMaxWidth().height(1200.dp)) {
-                HorizontalPager(state = pagerState) { page ->
-                    when (page) {
-                        0 -> SipCalculator()
-                        1 -> LumpsumCalculator()
-                        2 -> FdCalculator()
-                        else -> PpfEpfCalculator()
-                    }
+            // Hoist FD rates once per screen to avoid multiple loads and pass down
+            val fdRateRows = remember { loadFdRates(ctx) }
+            // Pager fills remaining space; each page handles its own scrolling
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            ) { page ->
+                when (page) {
+                    0 -> FdCalculator(fdRateRows)
+                    1 -> SipCalculator()
+                    2 -> LumpsumCalculator()
+                    else -> PpfEpfCalculator()
                 }
             }
         }
@@ -233,6 +234,7 @@ fun SipCalculator() {
                 value = rate,
                 onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Expected Return (% p.a.)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -240,6 +242,7 @@ fun SipCalculator() {
                 value = years,
                 onValueChange = { years = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Tenure (years)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(12.dp))
@@ -264,7 +267,7 @@ fun LumpsumCalculator() {
     val future = p * (1 + r).pow(n)
     val gain = (future - p).coerceAtLeast(0.0)
 
-    Section("Lumpsum Calculator") {
+    Section("Lump- Sum Calculator") {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             NumberField("Amount (₹)", amount) { amount = it }
             Spacer(Modifier.height(8.dp))
@@ -272,6 +275,7 @@ fun LumpsumCalculator() {
                 value = rate,
                 onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Expected Return (% p.a.)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -279,6 +283,7 @@ fun LumpsumCalculator() {
                 value = years,
                 onValueChange = { years = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Tenure (years)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(12.dp))
@@ -292,7 +297,7 @@ fun LumpsumCalculator() {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun FdCalculator() {
+fun FdCalculator(rateRows: List<FdRateRow>) {
 
     var principal by remember { mutableStateOf("") }
     var rate by remember { mutableStateOf("") }
@@ -302,8 +307,7 @@ fun FdCalculator() {
     var selectedBank by remember { mutableStateOf("") }
     var senior by remember { mutableStateOf(false) }
 
-    val ctx = LocalContext.current
-    val rateRows = remember { loadFdRates(ctx) }
+    // rateRows provided by parent; stable across recompositions
     val banks = remember(rateRows) { rateRows.map { it.bank }.distinct().sorted() }
     val tenures = remember(rateRows) {
         rateRows.map { normalizeTenure(it.tenure) }
@@ -361,7 +365,7 @@ fun FdCalculator() {
                             onValueChange = {},
                             label = { Text("Bank") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = bankExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                         )
                         ExposedDropdownMenu(expanded = bankExpanded, onDismissRequest = { bankExpanded = false }) {
                             banks.forEach { b ->
@@ -383,7 +387,7 @@ fun FdCalculator() {
                             onValueChange = {},
                             label = { Text("Tenure") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tenureExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                         )
                         ExposedDropdownMenu(expanded = tenureExpanded, onDismissRequest = { tenureExpanded = false }) {
                             tenures.forEach { tOpt ->
@@ -419,6 +423,7 @@ fun FdCalculator() {
                         value = rate,
                         onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                         label = { Text("Interest Rate (% p.a.)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(8.dp))
@@ -427,6 +432,7 @@ fun FdCalculator() {
                         value = years,
                         onValueChange = { years = it.filter { c -> c.isDigit() || c == '.' } },
                         label = { Text("Tenure (years)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(8.dp))
@@ -439,7 +445,7 @@ fun FdCalculator() {
                             onValueChange = {},
                             label = { Text("Frequency") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = freqExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                         )
                         ExposedDropdownMenu(expanded = freqExpanded, onDismissRequest = { freqExpanded = false }) {
                             listOf("Monthly", "Quarterly", "Half-yearly", "Yearly").forEach {
@@ -462,6 +468,7 @@ fun FdCalculator() {
             }
             Spacer(Modifier.height(4.dp))
             FdRatesComparison(
+                rateRows = rateRows,
                 selectedTenure = selectedTenure,
                 senior = senior,
                 onUseRate = { used -> rate = "%.2f".format(used) }
@@ -474,10 +481,7 @@ fun FdCalculator() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FdRatesComparison(selectedTenure: String, senior: Boolean, onUseRate: (Double) -> Unit) {
-
-    val ctx = LocalContext.current
-    val rateRows = remember { loadFdRates(ctx) }
+fun FdRatesComparison(rateRows: List<FdRateRow>, selectedTenure: String, senior: Boolean, onUseRate: (Double) -> Unit) {
     val norm = normalizeTenure(selectedTenure)
 
     var sortExpanded by remember { mutableStateOf(false) }
@@ -494,20 +498,30 @@ fun FdRatesComparison(selectedTenure: String, senior: Boolean, onUseRate: (Doubl
     }
 
     Spacer(Modifier.height(4.dp))
+    
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidthDp = cfg.screenWidthDp
+    // Responsive sizing: phone vs tablet
+    val isPhone = screenWidthDp < 600
+    val gridMinSize = if (isPhone) 110.dp else 140.dp
+    val gridHeight = if (isPhone) 300.dp else 240.dp
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("FD Rates ($norm)", style = MaterialTheme.typography.titleLarge)
+                Text("FD Rates ($norm)", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
                 ExposedDropdownMenuBox(expanded = sortExpanded, onExpandedChange = { sortExpanded = !sortExpanded }) {
                     OutlinedTextField(
                         readOnly = true,
                         value = sortLabel,
                         onValueChange = {},
-                        label = { Text("Sort") },
+                        label = { Text("Sort", style = MaterialTheme.typography.labelSmall) },
+                        textStyle = MaterialTheme.typography.bodySmall,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sortExpanded) },
-                        modifier = Modifier.menuAnchor().widthIn(min = 200.dp)
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                            .widthIn(min = if (isPhone) 120.dp else 160.dp, max = if (isPhone) 140.dp else 180.dp)
+                            .heightIn(max = 52.dp)
                     )
                     ExposedDropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
                         listOf("Name: A → Z", "Name: Z → A", "Rate: High → Low", "Rate: Low → High").forEach { opt ->
@@ -522,12 +536,12 @@ fun FdRatesComparison(selectedTenure: String, senior: Boolean, onUseRate: (Doubl
             Spacer(Modifier.height(8.dp))
 
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 140.dp),
-                modifier = Modifier.fillMaxWidth().height(240.dp),
+                columns = GridCells.Adaptive(minSize = gridMinSize),
+                modifier = Modifier.fillMaxWidth().height(gridHeight),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(sorted) { row ->
+                items(sorted, key = { it.bank + ":" + it.tenure }) { row ->
                     val rTxt = if (senior) row.seniorRate else row.nonSeniorRate
 
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -579,6 +593,7 @@ fun PpfEpfCalculator() {
                 value = rate,
                 onValueChange = { rate = it.filter { c -> c.isDigit() || c == '.' } },
                 label = { Text("Expected Return (% p.a.)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -587,6 +602,7 @@ fun PpfEpfCalculator() {
                 value = years,
                 onValueChange = { years = it.filter { c -> c.isDigit() } },
                 label = { Text("Tenure (years)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -596,7 +612,7 @@ fun PpfEpfCalculator() {
             ResultRow("Future Value", "₹ ${formatIndianNumber(future.toLong().toString())}")
             ResultRow("Estimated Gain", "₹ ${formatIndianNumber(gain.toLong().toString())}")
 
-            Divider(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
             ResultRow(
                 "80C Eligible (est.)",

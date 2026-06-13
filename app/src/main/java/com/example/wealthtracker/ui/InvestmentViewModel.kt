@@ -14,10 +14,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 
 @HiltViewModel
 class InvestmentViewModel @Inject constructor(
-    private val repo: InvestmentRepository
+    private val repo: InvestmentRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val investments: StateFlow<List<InvestmentEntity>> =
@@ -27,14 +30,22 @@ class InvestmentViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    // Fast count check for routing (doesn't load all data)
+    suspend fun hasInvestments(): Boolean = repo.getInvestmentCount() > 0
+
     // Filters
     private val _typeFilter = MutableStateFlow<String?>(null)
     val typeFilter: StateFlow<String?> = _typeFilter
-    val filteredInvestments: StateFlow<List<InvestmentEntity>> =
-        combine(investments, _typeFilter) { list, filter ->
-            val sorted = list.sortedByDescending { it.createdAt }
-            if (filter.isNullOrBlank() || filter == "All") sorted else sorted.filter { it.investmentType == filter }
-        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    val filteredInvestments: StateFlow<List<InvestmentEntity>> = combine(investments, _typeFilter) { list, filter ->
+        val sorted = list.sortedByDescending { it.createdAt }
+        val f = when (filter) { "Equity" -> "Stocks"; else -> filter }
+        if (f.isNullOrBlank() || f == "All") sorted else {
+            sorted.filter {
+                val t = if (it.investmentType == "Equity") "Stocks" else it.investmentType
+                t == f
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val totalCount: StateFlow<Int> = investments.map { it.size }
         .stateIn(viewModelScope, SharingStarted.Lazily, 0)
@@ -43,7 +54,7 @@ class InvestmentViewModel @Inject constructor(
         list.sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
 
-    fun setTypeFilter(type: String?) { _typeFilter.value = type }
+    fun setTypeFilter(type: String?) { _typeFilter.value = if (type == "Equity") "Stocks" else type }
 
     // Snackbars/events
     private val _message = MutableStateFlow<String?>(null)
@@ -51,7 +62,7 @@ class InvestmentViewModel @Inject constructor(
     fun consumeMessage() { _message.value = null }
 
     fun addInvestment(amountInput: String, investmentType: String, bankName: String?, displayName: String? = null) {
-        val amount = amountInput.toDoubleOrNull()
+        val amount = parseAmount(amountInput)
         val cleanType = investmentType.ifBlank { "Others" }
         if (amount == null || amount <= 0.0) { _message.value = "Enter a valid amount"; return }
         if (cleanType == "FD" && (bankName == null || bankName.isBlank())) {
@@ -63,6 +74,7 @@ class InvestmentViewModel @Inject constructor(
             viewModelScope.launch {
                 repo.addInvestment(name, amount, cleanType, null)
                 _message.value = "Added"
+                com.example.wealthtracker.widget.PortfolioWidgetProvider.updateAllWidgets(context)
             }
             return
         }
@@ -70,6 +82,8 @@ class InvestmentViewModel @Inject constructor(
             // Store type field as the investmentType for simpler display
             repo.addInvestment(cleanType, amount, cleanType, bankName)
             _message.value = "Added"
+            // Update widget after adding investment
+            com.example.wealthtracker.widget.PortfolioWidgetProvider.updateAllWidgets(context)
         }
     }
 
@@ -82,26 +96,47 @@ class InvestmentViewModel @Inject constructor(
         _message.value = "Cleared"
     }
 
-    fun updateInvestment(
-        id: Long,
-        newDisplayType: String,
-        newAmountInput: String,
-        newInvestmentType: String,
-        newBank: String?
-    ) {
-        val amount = newAmountInput.toDoubleOrNull() ?: return
-        val cleanType = newDisplayType.trim().ifEmpty { newInvestmentType }
-        val current = investments.value.firstOrNull { it.id == id } ?: return
+    fun deleteByIds(ids: List<Long>) {
+        viewModelScope.launch { repo.deleteByIds(ids) }
+        _message.value = "Cleared"
+    }
+
+    fun reAdd(entity: InvestmentEntity) {
         viewModelScope.launch {
-            repo.updateInvestment(
-                current.copy(
-                    type = cleanType,
-                    amount = amount,
-                    investmentType = newInvestmentType,
-                    bankName = if (newInvestmentType == "FD") newBank else null
-                )
+            repo.addInvestment(
+                type = entity.type,
+                amount = entity.amount,
+                investmentType = entity.investmentType,
+                bankName = entity.bankName
             )
-            _message.value = "Updated"
+            _message.value = "Restored"
+        }
+    }
+
+    fun addInvestmentFull(entity: InvestmentEntity) {
+        viewModelScope.launch {
+            repo.addInvestmentFull(entity)
+            _message.value = "Added"
+            // Update widget after adding investment
+            com.example.wealthtracker.widget.PortfolioWidgetProvider.updateAllWidgets(context)
+        }
+    }
+
+    fun updateInvestment(updatedEntity: InvestmentEntity) {
+        viewModelScope.launch {
+            repo.updateInvestment(updatedEntity)
+            // Message removed - parent screen shows its own success message
+        }
+    }
+
+    private fun parseAmount(input: String): Double? {
+        val clean = input.replace(",", "").trim()
+        if (clean.isEmpty()) return null
+        return try {
+            val bd = java.math.BigDecimal(clean).setScale(2, java.math.RoundingMode.HALF_UP)
+            bd.toDouble()
+        } catch (_: Exception) {
+            null
         }
     }
 

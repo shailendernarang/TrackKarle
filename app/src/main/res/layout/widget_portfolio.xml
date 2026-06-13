@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <!-- Header with app name and refresh indicator -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+        
+        <TextView
+            android:id="@+id/widget_app_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="TrackKaro"
+            android:textColor="?android:textColorPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:gravity="start" />
+            
+        <TextView
+            android:id="@+id/widget_last_updated"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Now"
+            android:textColor="?android:textColorSecondary"
+            android:textSize="9sp"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <!-- Main portfolio value -->
+    <TextView
+        android:id="@+id/widget_total_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="₹0"
+        android:textColor="?android:textColorPrimary"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="2dp" />
+
+    <!-- Investment count and growth -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="8dp">
+        
+        <TextView
+            android:id="@+id/widget_total_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 Investments"
+            android:textColor="?android:textColorSecondary"
+            android:textSize="11sp"
+            android:layout_marginEnd="8dp" />
+            
+        <TextView
+            android:id="@+id/widget_growth_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📈 +5.2%"
+            android:textColor="#4CAF50"
+            android:textSize="10sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Mini chart area (will be populated programmatically) -->
+    <LinearLayout
+        android:id="@+id/widget_chart_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="6dp">
+        
+        <!-- Top 3 investment types with bars -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            
+            <TextView
+                android:id="@+id/widget_type1_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FD"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="8sp" />
+                
+            <ProgressBar
+                android:id="@+id/widget_type1_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:indeterminate="false"
+                android:max="100"
+                android:layout_marginVertical="4dp" />
+                
+            <TextView
+                android:id="@+id/widget_type1_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹50K"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="7sp" />
+        </LinearLayout>
+        
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginHorizontal="4dp">
+            
+            <TextView
+                android:id="@+id/widget_type2_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MF"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="8sp" />
+                
+            <ProgressBar
+                android:id="@+id/widget_type2_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:indeterminate="false"
+                android:max="100"
+                android:layout_marginVertical="4dp" />
+                
+            <TextView
+                android:id="@+id/widget_type2_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹30K"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="7sp" />
+        </LinearLayout>
+        
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            
+            <TextView
+                android:id="@+id/widget_type3_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Gold"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="8sp" />
+                
+            <ProgressBar
+                android:id="@+id/widget_type3_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:indeterminate="false"
+                android:max="100"
+                android:layout_marginVertical="4dp" />
+                
+            <TextView
+                android:id="@+id/widget_type3_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹20K"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="7sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Bottom info -->
+    <TextView
+        android:id="@+id/widget_bottom_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tap to view details"
+        android:textColor="?android:textColorSecondary"
+        android:textSize="9sp"
+        android:gravity="center" />
+
+</LinearLayout>

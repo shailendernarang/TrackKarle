@@ -10,6 +10,8 @@ class DefaultInvestmentRepository @Inject constructor(
 ) : InvestmentRepository {
     override fun observeInvestments(): Flow<List<InvestmentEntity>> = dao.observeAll()
 
+    override suspend fun getInvestmentCount(): Int = dao.getInvestmentCount()
+
     override suspend fun addInvestment(type: String, amount: Double, investmentType: String, bankName: String?) {
         dao.insert(
             InvestmentEntity(
@@ -19,6 +21,10 @@ class DefaultInvestmentRepository @Inject constructor(
                 bankName = bankName
             )
         )
+    }
+
+    override suspend fun addInvestmentFull(entity: InvestmentEntity) {
+        dao.insert(entity)
     }
 
     override suspend fun deleteInvestment(entity: InvestmentEntity) {
