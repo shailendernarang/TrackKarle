@@ -2,9 +2,7 @@
 <resources>
     <!-- Base app theme -->
     <style name="Theme.WealthTracker" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Plain white background only; Compose ModernSplashScreen shows the icon + branding -->
         <item name="android:windowSplashScreenBackground">@color/splash_background</item>
-        <!-- ic_launcher is now a proper adaptive icon with white background — no black edges -->
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
     </style>
 </resources>
