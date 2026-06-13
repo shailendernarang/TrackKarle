@@ -207,13 +207,15 @@ class MainActivity : AppCompatActivity() {
                 FormatUtils.init(applicationContext)
                 
                 authenticated = !requireDeviceLock
-                
-                // Check if privacy consent has been given
-                showPrivacyConsent = !PrivacyPreferences.hasConsentBeenGiven(applicationContext)
-                
-                // Load privacy preferences
+
+                // Load privacy preferences first
                 analyticsEnabled = PrivacyPreferences.isAnalyticsEnabled(applicationContext)
                 crashReportingEnabled = PrivacyPreferences.isCrashReportingEnabled(applicationContext)
+
+                // Delay consent dialog so it doesn't stack on top of the system notification
+                // permission dialog that fires immediately at first launch
+                kotlinx.coroutines.delay(1800)
+                showPrivacyConsent = !PrivacyPreferences.hasConsentBeenGiven(applicationContext)
             }
             val scope = rememberCoroutineScope()
             // Re-evaluate auth on toggle

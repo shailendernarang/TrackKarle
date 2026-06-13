@@ -1,3 +1,11 @@
+## Strip verbose logging in release builds (Log.e kept for genuine errors)
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+    public static int i(...);
+    public static boolean isLoggable(java.lang.String, int);
+}
+
 ## Keep Retrofit interfaces and models, OkHttp, and Gson to avoid breaking release networking
 -keepattributes Signature
 -keepattributes Exceptions

@@ -22,10 +22,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.activity.compose.BackHandler
-import android.app.Activity
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
+import com.example.wealthtracker.util.findActivity
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -146,9 +145,9 @@ fun DashboardScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Appodeal banner ad
-                    val view = LocalView.current
-                    AppodealBanner(
-                        activity = view.context as Activity,
+                    val activity = LocalContext.current.findActivity()
+                    if (activity != null) AppodealBanner(
+                        activity = activity,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(90.dp)

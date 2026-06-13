@@ -1,9 +1,8 @@
 package com.example.wealthtracker.ui.screens
 
-import android.app.Activity
 import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
+import com.example.wealthtracker.util.findActivity
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -467,9 +466,9 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
             // News blocks
             NewsSection("Market News", marketNews)
             // Appodeal banner ad
-            val view = LocalView.current
-            AppodealBanner(
-                activity = view.context as Activity,
+            val activity = LocalContext.current.findActivity()
+            if (activity != null) AppodealBanner(
+                activity = activity,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(90.dp)

@@ -1,6 +1,5 @@
 package com.example.wealthtracker.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.view.WindowCompat
+import com.example.wealthtracker.util.findActivity
 
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFF66BB6A),
@@ -57,9 +57,10 @@ fun WealthTrackerTheme(
         else -> LightColorScheme
     }
     val view = LocalView.current
+    val activity = LocalContext.current.findActivity()
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
+            val window = activity?.window ?: return@SideEffect
             window.statusBarColor = colorScheme.primary.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
