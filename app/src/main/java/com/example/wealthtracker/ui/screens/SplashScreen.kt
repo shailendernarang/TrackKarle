@@ -201,13 +201,12 @@ fun ModernSplashScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(32.dp)
         ) {
-            // Animated Logo Container - Lottie handles its own loading
-            val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_investment))
-            LottieAnimation(
-                composition = composition,
-                iterations = LottieConstants.IterateForever,
+            // PNG icon loads instantly (no async parse); gold on dark bg is brand-consistent
+            Image(
+                painter = painterResource(id = R.mipmap.ic_launcher_legacy),
+                contentDescription = null,
                 modifier = Modifier
-                    .size(140.dp)
+                    .size(110.dp)
                     .alpha(logoAlpha.value)
                     .scale(logoScale.value)
             )

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- White background fills the full 108dp adaptive icon area cleanly;
+         the launcher applies its own mask shape + drop shadow on top. -->
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground>
+        <inset
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:drawable="@mipmap/ic_launcher_legacy"
+            android:inset="8%" />
+    </foreground>
+</adaptive-icon>

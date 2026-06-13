@@ -2,9 +2,9 @@
 <resources>
     <!-- Base app theme -->
     <style name="Theme.WealthTracker" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- System splash shows plain background; Compose ModernSplashScreen handles the visual. -->
-        <!-- The PNG launcher icon has a dark circular border that looks bad in the adaptive icon -->
-        <!-- circular clip, so we omit the icon here and let the Lottie animation be the splash. -->
         <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <!-- ic_launcher is now a proper adaptive icon with white background — no black edges -->
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
     </style>
 </resources>
