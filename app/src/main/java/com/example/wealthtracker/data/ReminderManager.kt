@@ -37,11 +37,15 @@ class ReminderManager private constructor(context: Context) {
     
     private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
     val reminders: StateFlow<List<Reminder>> = _reminders.asStateFlow()
-    
-    // Expose filtered StateFlows for UI observation
-    val activeReminders: StateFlow<List<Reminder>> = MutableStateFlow(emptyList())
-    val snoozedReminders: StateFlow<List<Reminder>> = MutableStateFlow(emptyList())
-    val dismissedReminders: StateFlow<List<Reminder>> = MutableStateFlow(emptyList())
+
+    private val _activeReminders = MutableStateFlow<List<Reminder>>(emptyList())
+    val activeReminders: StateFlow<List<Reminder>> = _activeReminders.asStateFlow()
+
+    private val _snoozedReminders = MutableStateFlow<List<Reminder>>(emptyList())
+    val snoozedReminders: StateFlow<List<Reminder>> = _snoozedReminders.asStateFlow()
+
+    private val _dismissedReminders = MutableStateFlow<List<Reminder>>(emptyList())
+    val dismissedReminders: StateFlow<List<Reminder>> = _dismissedReminders.asStateFlow()
     
     init {
         loadReminders()
@@ -160,34 +164,18 @@ class ReminderManager private constructor(context: Context) {
         }
     }
     
-    // Update filtered flows whenever reminders change
     private fun updateFilteredFlows() {
-        (activeReminders as MutableStateFlow).value = _reminders.value
+        _activeReminders.value = _reminders.value
             .filter { it.status == ReminderStatus.ACTIVE }
             .sortedBy { calculateDaysUntilMaturity(it.maturityDate) }
-        
-        (snoozedReminders as MutableStateFlow).value = _reminders.value
+
+        _snoozedReminders.value = _reminders.value
             .filter { it.status == ReminderStatus.SNOOZED }
             .sortedBy { calculateDaysUntilMaturity(it.maturityDate) }
-        
-        (dismissedReminders as MutableStateFlow).value = _reminders.value
+
+        _dismissedReminders.value = _reminders.value
             .filter { it.status == ReminderStatus.DISMISSED }
             .sortedByDescending { it.lastShownAt }
-    }
-    
-    // Get active reminders for dashboard (deprecated - use activeReminders flow)
-    fun getActiveReminders(): List<Reminder> {
-        return activeReminders.value
-    }
-    
-    // Get snoozed reminders (deprecated - use snoozedReminders flow)
-    fun getSnoozedReminders(): List<Reminder> {
-        return snoozedReminders.value
-    }
-    
-    // Get dismissed reminders (deprecated - use dismissedReminders flow)
-    fun getDismissedReminders(): List<Reminder> {
-        return dismissedReminders.value
     }
     
     // Mark reminder as "Got it" (dismiss)

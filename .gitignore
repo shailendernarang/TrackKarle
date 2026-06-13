@@ -30,6 +30,12 @@ proguard/
 
 # Log Files
 *.log
+logcat.txt
+app/logcat.txt
+
+# Research/generated docs (internal, not for repo)
+app/src/deep-research-report.md
+"app/TrackKaro (WealthTracker) – Feature Analysis & Recommendations.pdf"
 
 # Android Studio Navigation editor temp files
 .navigation/
