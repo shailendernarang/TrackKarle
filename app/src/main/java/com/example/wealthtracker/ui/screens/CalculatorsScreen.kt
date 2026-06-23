@@ -98,24 +98,24 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                     }
                 }
             )
+        },
+        bottomBar = {
+            val activity = com.example.wealthtracker.util.LocalActivity.current
+            if (activity != null) {
+                androidx.compose.material3.Surface(
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                ) {
+                    AppodealBanner(activity = activity, modifier = Modifier.fillMaxWidth().height(50.dp))
+                }
+            }
         }
     ) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(16.dp)
         ) {
             val ctx = LocalContext.current
-            // Appodeal banner ad
-            val activity = ctx.findActivity()
-            if (activity != null) AppodealBanner(
-                activity = activity,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-            )
-            Spacer(Modifier.height(8.dp))
             TabRow(selectedTabIndex = pagerState.currentPage) {
                 tabs.forEachIndexed { i, t ->
                     Tab(
@@ -133,11 +133,15 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth().weight(1f)
             ) { page ->
-                when (page) {
-                    0 -> FdCalculator(fdRateRows)
-                    1 -> SipCalculator()
-                    2 -> LumpsumCalculator()
-                    else -> PpfEpfCalculator()
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
+                ) {
+                    when (page) {
+                        0 -> FdCalculator(fdRateRows)
+                        1 -> SipCalculator()
+                        2 -> LumpsumCalculator()
+                        else -> PpfEpfCalculator()
+                    }
                 }
             }
         }

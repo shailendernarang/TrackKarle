@@ -1,5 +1,9 @@
 package com.example.wealthtracker.network
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -24,8 +28,8 @@ interface StocksService {
         @Query("q") query: String,
         @Query("quotesCount") quotesCount: Int = 10,
         @Query("newsCount") newsCount: Int = 0,
-        @Query("lang") lang: String = "en-IN",
-        @Query("region") region: String = "IN"
+        @Query("lang") lang: String = "en-US",
+        @Query("region") region: String = "US"
     ): SearchResponse
 }
 
@@ -41,7 +45,16 @@ data class QuoteItem(
     val regularMarketPrice: Double?,
     val regularMarketChange: Double?,
     val regularMarketChangePercent: Double?,
-    val regularMarketPreviousClose: Double?
+    val regularMarketPreviousClose: Double?,
+    // Pre/post-market fields (null when market is in REGULAR session)
+    val preMarketPrice: Double?,
+    val preMarketChange: Double?,
+    val preMarketChangePercent: Double?,
+    val postMarketPrice: Double?,
+    val postMarketChange: Double?,
+    val postMarketChangePercent: Double?,
+    // "PRE" | "REGULAR" | "POST" | "CLOSED" | "PREPRE" | "POSTPOST"
+    val marketState: String?
 )
 
 data class ChartResponse(val chart: ChartResult)
@@ -49,7 +62,7 @@ data class ChartResponse(val chart: ChartResult)
 data class ChartResult(val result: List<ChartEntry> = emptyList())
 
 data class ChartEntry(
-    val timestamp: List<Long> = emptyList(), 
+    val timestamp: List<Long> = emptyList(),
     val indicators: Indicators? = null,
     val meta: ChartMeta? = null
 )
@@ -74,18 +87,120 @@ data class SearchQuote(
 )
 
 object StocksApiProvider {
-    private val httpClient: okhttp3.OkHttpClient by lazy {
+    private const val USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+
+    private var appContext: android.content.Context? = null
+
+    fun init(context: android.content.Context) {
+        appContext = context.applicationContext
+    }
+
+    // ── Crumb / session ─────────────────────────────────────────────
+    @Volatile private var crumb: String? = null
+    private val crumbMutex = Mutex()
+
+    // Shared cookie jar — session cookies from fc.yahoo.com must be reused
+    // on every subsequent request to query1.finance.yahoo.com
+    private val cookieStore = mutableListOf<okhttp3.Cookie>()
+    private val cookieJar: okhttp3.CookieJar = object : okhttp3.CookieJar {
+        override fun saveFromResponse(url: okhttp3.HttpUrl, cookies: List<okhttp3.Cookie>) {
+            synchronized(cookieStore) { cookieStore.addAll(cookies) }
+        }
+        override fun loadForRequest(url: okhttp3.HttpUrl): List<okhttp3.Cookie> {
+            synchronized(cookieStore) { return cookieStore.toList() }
+        }
+    }
+
+    // Bare client used only for the two crumb-bootstrap requests (no crumb interceptor)
+    private val bootstrapClient: okhttp3.OkHttpClient by lazy {
         okhttp3.OkHttpClient.Builder()
+            .cookieJar(cookieJar)
             .addInterceptor { chain ->
-                val req = chain.request().newBuilder()
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36")
+                chain.proceed(
+                    chain.request().newBuilder()
+                        .header("User-Agent", USER_AGENT)
+                        .header("Accept", "*/*")
+                        .build()
+                )
+            }
+            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
+    private suspend fun fetchCrumb(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            // Step 1 — hit fc.yahoo.com so Yahoo sets the A1/A3 session cookies
+            bootstrapClient.newCall(
+                okhttp3.Request.Builder().url("https://fc.yahoo.com").build()
+            ).execute().close()
+
+            // Step 2 — exchange cookies for a crumb token
+            val resp = bootstrapClient.newCall(
+                okhttp3.Request.Builder()
+                    .url("https://query1.finance.yahoo.com/v1/test/getcrumb")
+                    .build()
+            ).execute()
+
+            resp.use { r ->
+                val body = r.body?.string()?.trim()
+                // Sanity-check: crumb is a short alphanumeric string, not HTML
+                if (r.isSuccessful && !body.isNullOrBlank() && !body.startsWith("<")) body
+                else null
+            }
+        }.getOrNull()
+    }
+
+    /** Call once before the first Yahoo Finance request (safe to call repeatedly). */
+    suspend fun ensureCrumb() {
+        if (crumb != null) return
+        crumbMutex.withLock {
+            if (crumb != null) return
+            crumb = fetchCrumb()
+        }
+    }
+
+    /** Force-refresh the crumb (call after a 401 response). */
+    suspend fun refreshCrumb() {
+        crumbMutex.withLock {
+            crumb = null
+            crumb = fetchCrumb()
+        }
+    }
+
+    // ── Main HTTP client ─────────────────────────────────────────────
+    private val httpClient: okhttp3.OkHttpClient by lazy {
+        val builder = okhttp3.OkHttpClient.Builder()
+            .cookieJar(cookieJar)   // reuse the session cookies obtained during crumb fetch
+            .addInterceptor { chain ->
+                val original = chain.request()
+                // Append crumb to every Yahoo Finance request that doesn't already have it
+                val url = crumb?.let { c ->
+                    original.url.newBuilder().addQueryParameter("crumb", c).build()
+                } ?: original.url
+                val req = original.newBuilder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
                     .header("Accept", "application/json")
                     .build()
                 chain.proceed(req)
             }
             .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
+
+        if (com.ss.wealthtracker.BuildConfig.DEBUG) {
+            appContext?.let { ctx ->
+                builder.addInterceptor(
+                    com.chuckerteam.chucker.api.ChuckerInterceptor.Builder(ctx)
+                        .maxContentLength(250_000L)
+                        .alwaysReadResponseBody(true)
+                        .build()
+                )
+            }
+        }
+
+        builder.build()
     }
 
     private fun newRetrofit(baseUrl: String): retrofit2.Retrofit =

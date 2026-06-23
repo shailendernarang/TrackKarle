@@ -12,7 +12,7 @@ object BiometricUtils {
      * Check if device lock (PIN/Pattern/Password/Biometric) is available on this device
      */
     fun isDeviceLockAvailable(context: Context): Boolean {
-        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val keyguardManager = context.getSystemService(KeyguardManager::class.java) ?: return false
         
         // First check if device has any security set up
         if (!keyguardManager.isDeviceSecure) {
@@ -39,7 +39,7 @@ object BiometricUtils {
      * Check if device lock is currently set up and ready to use
      */
     fun isDeviceLockReady(context: Context): Boolean {
-        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val keyguardManager = context.getSystemService(KeyguardManager::class.java) ?: return false
         
         if (!keyguardManager.isDeviceSecure) {
             return false
@@ -66,7 +66,7 @@ object BiometricUtils {
      * Get user-friendly status message for device lock availability
      */
     fun getDeviceLockStatusMessage(context: Context): String {
-        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val keyguardManager = context.getSystemService(KeyguardManager::class.java) ?: return "No screen lock set up"
         
         if (!keyguardManager.isDeviceSecure) {
             return "No screen lock set up"

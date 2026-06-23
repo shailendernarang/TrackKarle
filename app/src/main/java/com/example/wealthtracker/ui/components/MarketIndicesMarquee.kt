@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,32 +14,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.wealthtracker.network.StocksApiProvider
+import com.example.wealthtracker.util.MarketHours
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.util.Log
-import androidx.compose.runtime.saveable.listSaver
 
 data class MarketIndex(
     val symbol: String,
     val name: String,
     val price: Double,
     val change: Double,
-    val changePercent: Double
-) {
-    companion object {
-        val Saver = listSaver<MarketIndex, Any>(
-            save = { listOf(it.symbol, it.name, it.price, it.change, it.changePercent) },
-            restore = { 
-                MarketIndex(
-                    symbol = it[0] as String,
-                    name = it[1] as String,
-                    price = it[2] as Double,
-                    change = it[3] as Double,
-                    changePercent = it[4] as Double
-                )
-            }
-        )
-    }
+    val changePercent: Double,
+    val preMarketPrice: Double = 0.0,
+    val preMarketChange: Double = 0.0,
+    val preMarketChangePercent: Double = 0.0,
+    val postMarketPrice: Double = 0.0,
+    val postMarketChange: Double = 0.0,
+    val postMarketChangePercent: Double = 0.0,
+    val marketState: String = "REGULAR"
+)
+
+// In-memory cache — survives navigation, cleared only on process death
+private object MarketDataCache {
+    var indices: List<MarketIndex> = emptyList()
 }
 
 @Composable
@@ -48,75 +44,47 @@ fun MarketIndicesMarquee(
     modifier: Modifier = Modifier,
     refreshIntervalSeconds: Int = 30
 ) {
-    var indices by rememberSaveable(stateSaver = listSaver(
-        save = { it.map { index -> with(MarketIndex.Saver) { save(index) } } },
-        restore = { it.map { saved -> MarketIndex.Saver.restore(saved as List<Any>)!! } }
-    )) { mutableStateOf<List<MarketIndex>>(emptyList()) }
+    // Seed from cache so navigating back shows data instantly with no API call
+    var indices by remember { mutableStateOf(MarketDataCache.indices) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // Check if market is open based on timezone
-    fun isMarketHours(): Boolean {
-        val calendar = java.util.Calendar.getInstance()
-        val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-        // Market hours: 9 AM to 3 PM (15:00)
-        return hour in 9..14
-    }
-    
     // Fetch market indices data
     suspend fun fetchIndices(): List<MarketIndex> {
         val symbols = listOf(
-            // India
-            "^NSEI" to "NIFTY 50",
-            "^BSESN" to "SENSEX",
-            // US
-            "^GSPC" to "S&P 500",
-            "^DJI" to "DOW JONES",
-            "^IXIC" to "NASDAQ",
-            // Europe
-            "^FTSE" to "FTSE 100",      // UK
-            "^GDAXI" to "DAX",          // Germany
-            "^FCHI" to "CAC 40",        // France
-            // Asia Pacific
-            "^N225" to "NIKKEI 225",    // Japan
-            "^HSI" to "HANG SENG",      // Hong Kong
-            "000001.SS" to "SSE",       // Shanghai
-            "^AXJO" to "ASX 200"        // Australia
+            "^NSEI"     to "NIFTY 50",   "^BSESN"    to "SENSEX",
+            "^GSPC"     to "S&P 500",    "^DJI"      to "DOW Jones",
+            "^IXIC"     to "NASDAQ",     "^FTSE"     to "FTSE 100",
+            "^GDAXI"    to "DAX",        "^FCHI"     to "CAC 40",
+            "^N225"     to "Nikkei 225", "^HSI"      to "Hang Seng",
+            "000001.SS" to "Shanghai",   "^AXJO"     to "ASX 200"
         )
+        val symbolToName = symbols.toMap()
 
-        val results = mutableListOf<MarketIndex>()
-        
-        symbols.forEach { (symbol, name) ->
-            runCatching {
-                // Use chart endpoint with 1 day range to get latest data
-                val response = StocksApiProvider.service.chart(symbol, range = "1d", interval = "1d")
-                val result = response.chart.result.firstOrNull()
-                
-                if (result != null) {
-                    val meta = result.meta
-                    val currentPrice = meta?.regularMarketPrice ?: 0.0
-                    val previousClose = meta?.chartPreviousClose ?: meta?.previousClose ?: 0.0
-                    
-                    val change = currentPrice - previousClose
-                    val changePercent = if (previousClose != 0.0) {
-                        (change / previousClose) * 100.0
-                    } else 0.0
-                    
-                    results.add(
-                        MarketIndex(
-                            symbol = symbol,
-                            name = name,
-                            price = currentPrice,
-                            change = change,
-                            changePercent = changePercent
-                        )
-                    )
-                }
-            }.onFailure { e ->
-                Log.e("MarketMarquee", "Failed to fetch $symbol: ${e.message}")
+        return runCatching {
+            StocksApiProvider.ensureCrumb()
+            val symbolStr = symbols.joinToString(",") { it.first }
+            val quoteItems = StocksApiProvider.service.quotes(symbolStr).quoteResponse.result
+            quoteItems.mapNotNull { item ->
+                val sym  = item.symbol ?: return@mapNotNull null
+                val name = symbolToName[sym] ?: return@mapNotNull null
+                val price = item.regularMarketPrice ?: return@mapNotNull null
+                MarketIndex(
+                    symbol = sym, name = name,
+                    price = price,
+                    change = item.regularMarketChange ?: 0.0,
+                    changePercent = item.regularMarketChangePercent ?: 0.0,
+                    preMarketPrice = item.preMarketPrice ?: 0.0,
+                    preMarketChange = item.preMarketChange ?: 0.0,
+                    preMarketChangePercent = item.preMarketChangePercent ?: 0.0,
+                    postMarketPrice = item.postMarketPrice ?: 0.0,
+                    postMarketChange = item.postMarketChange ?: 0.0,
+                    postMarketChangePercent = item.postMarketChangePercent ?: 0.0,
+                    marketState = item.marketState ?: "REGULAR"
+                )
             }
-        }
-        
-        return results
+        }.onFailure { e ->
+            Log.e("MarketMarquee", "fetchIndices failed: ${e.message}")
+        }.getOrDefault(emptyList())
     }
 
     // Auto-refresh effect - only during market hours
@@ -126,17 +94,19 @@ fun MarketIndicesMarquee(
             isLoading = true
             val data = fetchIndices()
             if (data.isNotEmpty()) {
+                MarketDataCache.indices = data
                 indices = data
             }
             isLoading = false
         }
-        
+
         while (true) {
-            if (isMarketHours()) {
+            if (MarketHours.isAnyMarketOpen()) {
                 // During market hours - refresh every 30 seconds
                 delay(refreshIntervalSeconds * 1000L)
                 val data = fetchIndices()
                 if (data.isNotEmpty()) {
+                    MarketDataCache.indices = data
                     indices = data
                 }
             } else {

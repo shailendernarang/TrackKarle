@@ -1,3 +1,7 @@
+## Facebook Infer annotations used by Meta Ads SDK — not shipped in the AAR
+-dontwarn com.facebook.infer.annotation.**
+-dontwarn com.facebook.ads.**
+
 ## Strip verbose logging in release builds (Log.e kept for genuine errors)
 -assumenosideeffects class android.util.Log {
     public static int d(...);

@@ -466,13 +466,8 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
             // News blocks
             NewsSection("Market News", marketNews)
             // Appodeal banner ad
-            val activity = LocalContext.current.findActivity()
-            if (activity != null) AppodealBanner(
-                activity = activity,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-            )
+            val activity = com.example.wealthtracker.util.LocalActivity.current
+            if (activity != null) AppodealBanner(activity = activity, modifier = Modifier.fillMaxWidth().height(50.dp))
             NewsSection("Top 10 Stocks - News", top10News)
             NewsSection("Top 10 Penny Stocks - News", pennyNews)
             }

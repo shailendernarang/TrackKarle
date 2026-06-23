@@ -94,7 +94,7 @@ private fun InsightCardItem(
     ) {
         Column(
             modifier = Modifier
-                .padding(12.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -102,14 +102,14 @@ private fun InsightCardItem(
                 imageVector = insight.icon,
                 contentDescription = null,
                 tint = insight.color,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(22.dp)
             )
-            
-            Spacer(modifier = Modifier.height(6.dp))
-            
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             Text(
                 text = insight.value,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = insight.color,
                 textAlign = TextAlign.Center,
@@ -185,40 +185,53 @@ private fun DetailedInsightItem(
     insight: String,
     modifier: Modifier = Modifier
 ) {
-    val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
-    
+    // Derive severity from the emoji prefix the generator already embeds
+    val isWarning    = insight.startsWith("⚠") || insight.startsWith("⚡")
+    val isPositive   = insight.startsWith("✅") || insight.startsWith("🏆") ||
+                       insight.startsWith("✨") || insight.startsWith("🌟") ||
+                       insight.startsWith("👍") || insight.startsWith("💰") ||
+                       insight.startsWith("🛡") || insight.startsWith("🎯 Well")
+    val isSuggestion = insight.startsWith("💡") || insight.startsWith("🌱") ||
+                       insight.startsWith("📊") || insight.startsWith("📈") ||
+                       insight.startsWith("📋") || insight.startsWith("🎯 Consider") ||
+                       insight.startsWith("🎯 Set") || insight.startsWith("🚀")
+
+    val tint = when {
+        isWarning    -> Color(0xFFDC2626)
+        isPositive   -> Color(0xFF16A34A)
+        isSuggestion -> Color(0xFFF59E0B)
+        else         -> Color(0xFF2563EB)
+    }
+    val bg = tint.copy(alpha = 0.07f)
+    val icon = when {
+        isWarning    -> Icons.Default.Warning
+        isPositive   -> Icons.Default.CheckCircle
+        isSuggestion -> Icons.Default.Lightbulb
+        else         -> Icons.Default.Info
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isDarkTheme) {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)
-                }
-            )
+            .background(bg)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Default.Lightbulb,
+                imageVector = icon,
                 contentDescription = null,
-                tint = if (isDarkTheme) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                },
-                modifier = Modifier.size(24.dp)
+                tint = tint,
+                modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = insight,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 20.sp
+                lineHeight = 18.sp
             )
         }
     }
@@ -289,7 +302,7 @@ private fun generateInsights(investments: List<InvestmentEntity>, currentFilter:
         investmentsByType.size >= 6 -> "Excellent"
         investmentsByType.size >= 4 -> "Good"
         investmentsByType.size >= 3 -> "Fair"
-        else -> "Poor"
+        else -> "Low"
     }
     
     // Add filter-specific insights

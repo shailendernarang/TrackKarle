@@ -7,10 +7,12 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import kotlinx.coroutines.runBlocking
+import com.example.wealthtracker.data.local.DebtDao
 import com.example.wealthtracker.data.local.InvestmentDao
 import com.example.wealthtracker.data.local.WealthTrackerDatabase
 import com.example.wealthtracker.data.local.MIGRATION_1_2
 import com.example.wealthtracker.data.local.MIGRATION_2_3
+import com.example.wealthtracker.data.local.MIGRATION_3_4
 import com.example.wealthtracker.data.repository.DefaultInvestmentRepository
 import com.example.wealthtracker.data.repository.InvestmentRepository
 import dagger.Binds
@@ -68,7 +70,7 @@ object AppModule {
             context,
             WealthTrackerDatabase::class.java,
             if (factory != null) "wealth_tracker_encrypted.db" else "wealth_tracker.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
         if (factory != null) builder.openHelperFactory(factory)
         val db = builder.build()
 
@@ -263,7 +265,7 @@ object AppModule {
                     }
                     val encDb = Room.databaseBuilder(context, WealthTrackerDatabase::class.java, "wealth_tracker_encrypted.db")
                         .openHelperFactory(encFactory)
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                         .build()
                     try {
                         val plainDao = db.investmentDao()
@@ -294,4 +296,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideInvestmentDao(db: WealthTrackerDatabase): InvestmentDao = db.investmentDao()
+
+    @Provides
+    @Singleton
+    fun provideDebtDao(db: WealthTrackerDatabase): DebtDao = db.debtDao()
 }

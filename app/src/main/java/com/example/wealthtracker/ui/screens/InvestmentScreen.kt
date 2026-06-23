@@ -670,33 +670,21 @@ fun InvestmentScreen(
                     TotalsBar(items)
                 }
                 androidx.compose.material3.Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Appodeal banner ad
-                        val activity = LocalContext.current.findActivity()
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Appodeal banner ad — no padding so it fills edge-to-edge
+                        val activity = com.example.wealthtracker.util.LocalActivity.current
                         if (activity != null) AppodealBanner(
                             activity = activity,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(90.dp)
+                            modifier = Modifier.fillMaxWidth().height(50.dp)
                         )
-                        Spacer(Modifier.height(6.dp))
-                        Row(
+                        Text(
+                            "Private • No cloud sync • Offline",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Private • No cloud sync • Offline",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                                .align(Alignment.CenterHorizontally)
+                                .padding(vertical = 6.dp)
+                        )
                     }
                 }
             }

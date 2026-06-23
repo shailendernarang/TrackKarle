@@ -130,6 +130,32 @@ object FormatUtils {
         return nf.format(value)
     }
     
+    /**
+     * Formats a raw amount string (digits + optional decimal) with locale-aware grouping separators.
+     * India: 1,00,000  |  Others: 100,000
+     * Preserves trailing "." so the user can keep typing decimals.
+     */
+    fun formatAmountInput(raw: String): String {
+        val clean = raw.replace(",", "").trim()
+        if (clean.isBlank()) return ""
+        val hasDot = clean.contains('.')
+        val parts = clean.split('.')
+        val intPart = parts[0].filter { it.isDigit() }
+        val decPart = parts.getOrNull(1)?.filter { it.isDigit() }?.take(2) ?: ""
+        if (intPart.isEmpty()) return if (hasDot) "." else ""
+        val num = intPart.toLongOrNull() ?: return clean
+        val pattern = if (countryCode == "IN") "#,##,##0" else "#,###,###,###"
+        val dfs = DecimalFormatSymbols(Locale.ENGLISH)
+        val df = DecimalFormat(pattern, dfs)
+        var result = df.format(num)
+        if (hasDot) result += "." + decPart
+        return result
+    }
+
+    /** Strips grouping separators and parses to Double. */
+    fun parseAmountInput(formatted: String): Double? =
+        formatted.replace(",", "").toDoubleOrNull()
+
     // Initialize currency from UserPreferences
     fun init(context: Context) {
         val prefs = com.example.wealthtracker.data.UserPreferences(context)

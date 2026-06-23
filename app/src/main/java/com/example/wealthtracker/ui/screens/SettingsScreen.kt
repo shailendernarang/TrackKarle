@@ -1,34 +1,21 @@
 package com.example.wealthtracker.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stars
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ss.wealthtracker.R
 import android.content.Intent
@@ -37,9 +24,8 @@ import com.ss.wealthtracker.BuildConfig
 import com.example.wealthtracker.util.BiometricUtils
 import com.example.wealthtracker.analytics.AnalyticsManager
 import com.example.wealthtracker.analytics.TrackScreen
-import androidx.compose.runtime.remember
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     darkMode: Boolean,
@@ -57,81 +43,120 @@ fun SettingsScreen(
     onOpenReferral: (() -> Unit)? = null,
     onOpenPremium: (() -> Unit)? = null
 ) {
+    val ctx = LocalContext.current
+    val analytics = remember { AnalyticsManager(ctx) }
+    TrackScreen(screenName = "Settings", analyticsManager = analytics)
+    val isDeviceLockAvailable = BiometricUtils.isDeviceLockAvailable(ctx)
+    var showLanguageDialog by remember { mutableStateOf(false) }
+
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("Language") },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (useHindiNumerals) onToggleHindiNumerals()
+                                showLanguageDialog = false
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        RadioButton(selected = !useHindiNumerals, onClick = {
+                            if (useHindiNumerals) onToggleHindiNumerals()
+                            showLanguageDialog = false
+                        })
+                        Text("English", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (!useHindiNumerals) onToggleHindiNumerals()
+                                showLanguageDialog = false
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        RadioButton(selected = useHindiNumerals, onClick = {
+                            if (!useHindiNumerals) onToggleHindiNumerals()
+                            showLanguageDialog = false
+                        })
+                        Column {
+                            Text("हिंदी", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                "Hindi numerals",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
                 },
                 title = { Text(stringResource(id = R.string.settings)) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { inner ->
-        val ctx = LocalContext.current
-        val analytics = remember { AnalyticsManager(ctx) }
-        TrackScreen(screenName = "Settings", analyticsManager = analytics)
-        val isDeviceLockAvailable = BiometricUtils.isDeviceLockAvailable(ctx)
-        
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
         ) {
-            // Premium section
+            // ── Premium ──────────────────────────────────────────────────────
             if (onOpenPremium != null) {
+                Spacer(Modifier.height(12.dp))
                 if (isPremium) {
-                    // Premium badge
-                    androidx.compose.material3.Card(
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = androidx.compose.material3.CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Stars,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Premium Active",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                            )
+                            Icon(Icons.Default.Stars, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Premium Active", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
                     }
                 } else {
-                    // Go Premium button
-                    androidx.compose.material3.Button(
-                        onClick = onOpenPremium,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Stars,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = onOpenPremium, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Stars, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text("Upgrade to Premium")
                     }
                 }
+                Spacer(Modifier.height(8.dp))
                 HorizontalDivider()
             }
-            
-            SettingRow(
-                title = stringResource(id = R.string.toggle_dark_mode),
+
+            // ── Preferences ──────────────────────────────────────────────────
+            SectionHeader("Preferences")
+
+            SettingToggleRow(
+                title = "Dark Mode",
                 checked = darkMode,
                 onToggle = {
                     onToggleDarkMode()
@@ -139,11 +164,17 @@ fun SettingsScreen(
                 }
             )
             HorizontalDivider()
-            
-            // Only show device lock option if it's available on this device
+
+            SettingNavRow(
+                title = "Language",
+                trailingLabel = if (useHindiNumerals) "हिंदी" else "English",
+                onClick = { showLanguageDialog = true }
+            )
+            HorizontalDivider()
+
             if (isDeviceLockAvailable) {
-                SettingRow(
-                    title = if (requireDeviceLock) stringResource(id = R.string.require_device_lock_on) else stringResource(id = R.string.require_device_lock_off),
+                SettingToggleRow(
+                    title = "Require Device Lock",
                     checked = requireDeviceLock,
                     onToggle = {
                         onToggleRequireDeviceLock()
@@ -152,118 +183,171 @@ fun SettingsScreen(
                 )
                 HorizontalDivider()
             }
-            SettingRow(
-                title = stringResource(id = R.string.change_language_hindi),
-                checked = useHindiNumerals,
-                onToggle = {
-                    onToggleHindiNumerals()
-                    analytics.logSettingChanged("use_hindi_numerals", if (useHindiNumerals) "off" else "on")
+
+            // ── Privacy & Data ───────────────────────────────────────────────
+            if (onToggleAnalytics != null || onToggleCrashReporting != null) {
+                SectionHeader("Privacy & Data")
+
+                if (onToggleAnalytics != null) {
+                    SettingToggleRow(
+                        title = "Usage Analytics",
+                        subtitle = "Help us improve the app by sharing anonymous usage data",
+                        checked = analyticsEnabled,
+                        onToggle = {
+                            onToggleAnalytics()
+                            analytics.logSettingChanged("analytics_enabled", if (analyticsEnabled) "off" else "on")
+                        }
+                    )
+                    HorizontalDivider()
+                }
+
+                if (onToggleCrashReporting != null) {
+                    SettingToggleRow(
+                        title = "Crash Reports",
+                        subtitle = "Automatically send crash reports to help us fix bugs faster",
+                        checked = crashReportingEnabled,
+                        onToggle = {
+                            onToggleCrashReporting()
+                            analytics.logSettingChanged("crash_reporting_enabled", if (crashReportingEnabled) "off" else "on")
+                        }
+                    )
+                    HorizontalDivider()
+                }
+            }
+
+            // ── About ────────────────────────────────────────────────────────
+            SectionHeader("About")
+
+            if (onOpenReferral != null) {
+                SettingNavRow(
+                    title = "Invite Friends",
+                    subtitle = "Share TrackKaro with others",
+                    onClick = onOpenReferral
+                )
+                HorizontalDivider()
+            }
+
+            SettingNavRow(
+                title = "Privacy Policy",
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://sites.google.com/view/trackkarle/home"))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    runCatching { ctx.startActivity(intent) }
                 }
             )
             HorizontalDivider()
-            
-            // Privacy & Data section
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Privacy & Data",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-            )
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
-            
-            if (onToggleAnalytics != null) {
-                SettingRow(
-                    title = "Usage Analytics",
-                    checked = analyticsEnabled,
-                    onToggle = {
-                        onToggleAnalytics()
-                        analytics.logSettingChanged("analytics_enabled", if (analyticsEnabled) "off" else "on")
-                    }
-                )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Version", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "Help us improve the app by sharing anonymous usage data",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
+                    BuildConfig.VERSION_NAME,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
-            
-            if (onToggleCrashReporting != null) {
-                SettingRow(
-                    title = "Crash Reports",
-                    checked = crashReportingEnabled,
-                    onToggle = {
-                        onToggleCrashReporting()
-                        analytics.logSettingChanged("crash_reporting_enabled", if (crashReportingEnabled) "off" else "on")
-                    }
-                )
-                Text(
-                    "Automatically send crash reports to help us fix bugs faster",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
-            }
-            
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
-            
-            // Referral section
-            if (onOpenReferral != null) {
-                androidx.compose.material3.TextButton(
-                    onClick = onOpenReferral,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Invite Friends",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                HorizontalDivider()
-            }
-            
-            // App info
-            val appName = try {
-                val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, 0)
-                ctx.packageManager.getApplicationLabel(ai).toString()
-            } catch (e: Exception) { "TrackKaro" }
-            val version = BuildConfig.VERSION_NAME
-            Text("App", style = MaterialTheme.typography.titleMedium)
-            Text("$appName v$version", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            // Privacy Policy link
-            androidx.compose.material3.TextButton(onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://sites.google.com/view/trackkarle/home"))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { ctx.startActivity(intent) }
-            }) { Text("Privacy Policy") }
+
+            Spacer(Modifier.height(32.dp))
         }
     }
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
 @Composable
-private fun SettingRow(title: String, checked: Boolean, onToggle: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 20.dp, bottom = 2.dp)
+    )
+}
+
+@Composable
+private fun SettingToggleRow(
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
         ) {
-            Text(if (checked) stringResource(id = R.string.settings_on) else stringResource(id = R.string.settings_off), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Switch(checked = checked, onCheckedChange = { onToggle() })
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Switch(checked = checked, onCheckedChange = { onToggle() })
+    }
+}
+
+@Composable
+private fun SettingNavRow(
+    title: String,
+    subtitle: String? = null,
+    trailingLabel: String? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            if (trailingLabel != null) {
+                Text(
+                    trailingLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                Icons.Default.KeyboardArrowRight,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

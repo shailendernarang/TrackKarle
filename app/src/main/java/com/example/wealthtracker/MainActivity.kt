@@ -53,12 +53,15 @@ import androidx.compose.animation.fadeOut
  
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.wealthtracker.ui.InvestmentViewModel
+import com.example.wealthtracker.ui.DebtViewModel
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.example.wealthtracker.ui.theme.WealthTrackerTheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.example.wealthtracker.util.FormatUtils
+import com.example.wealthtracker.util.LocalActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import com.example.wealthtracker.data.SettingsStore
 import androidx.compose.runtime.rememberCoroutineScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -115,9 +118,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         
         // Initialize Appodeal SDK for ads
-        Appodeal.setTesting(false) // Production mode - real ads
-        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.none) // Production - no verbose logging
+        Appodeal.setTesting(false)
+        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.none)
         
+        // Smart banners fill the full screen width instead of the fixed 320dp standard
+        Appodeal.setSmartBanners(true)
+
         // Enable 728x90 banners for tablets (devices > 7 inches)
         Appodeal.set728x90Banners(true)
         
@@ -132,7 +138,7 @@ class MainActivity : AppCompatActivity() {
         Appodeal.initialize(
             this,
             com.ss.wealthtracker.BuildConfig.APPODEAL_API_KEY,
-            Appodeal.BANNER,
+            Appodeal.BANNER or Appodeal.NATIVE,
             object : ApdInitializationCallback {
                 override fun onInitializationFinished(errors: List<ApdInitializationError>?) {
                     val initResult = if (errors.isNullOrEmpty()) "successfully" else "with ${errors.size} errors"
@@ -140,10 +146,11 @@ class MainActivity : AppCompatActivity() {
                     errors?.forEach { error ->
                         Log.e("Appodeal", "❌ Init error: $error")
                     }
-                    // Auto-cache is enabled by default and optimal for banners
-                    // Banners auto-refresh every 15 seconds - no manual cache needed
-                    Log.d("Appodeal", "📊 Auto-cache enabled: ${Appodeal.isAutoCacheEnabled(Appodeal.BANNER)}")
-                    Log.d("Appodeal", "🔄 Shared instance enabled: ${Appodeal.isSharedAdsInstanceAcrossActivities()}")
+                    Log.d("Appodeal", "📊 Auto-cache BANNER: ${Appodeal.isAutoCacheEnabled(Appodeal.BANNER)}")
+                    Log.d("Appodeal", "📊 Auto-cache NATIVE: ${Appodeal.isAutoCacheEnabled(Appodeal.NATIVE)}")
+                    // Explicitly cache native ads — auto-cache doesn't always trigger for native
+                    Appodeal.cache(this@MainActivity, Appodeal.NATIVE)
+                    Log.d("Appodeal", "🔄 Native cache requested")
                 }
             }
         )
@@ -224,6 +231,7 @@ class MainActivity : AppCompatActivity() {
                     authenticated = true
                 }
             }
+            CompositionLocalProvider(LocalActivity provides this@MainActivity) {
             WealthTrackerTheme(darkTheme = darkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -235,6 +243,7 @@ class MainActivity : AppCompatActivity() {
                     // Initialize navigation early to avoid blank screen during transition
                     val nav = rememberNavController()
                     val vm: InvestmentViewModel = hiltViewModel()
+                    val debtVm: DebtViewModel = hiltViewModel()
                     val userPrefs = remember { UserPreferences(this@MainActivity) }
                     
                     // Show Privacy Consent Dialog if not yet given
@@ -352,13 +361,33 @@ class MainActivity : AppCompatActivity() {
                                     WithLocalizedContext(useHindiNumerals) {
                                         DashboardScreen(
                                             viewModel = vm,
+                                            debtViewModel = debtVm,
                                             onAddClick = { nav.navigate("invest") },
                                             onOpenInvestments = { nav.navigate("invest") },
                                             onOpenCalculators = { nav.navigate("calculators?tab=fd") },
                                             onOpenSettings = { nav.navigate("settings") },
-                                            onOpenReminders = { nav.navigate("reminders") }
+                                            onOpenReminders = { nav.navigate("reminders") },
+                                            onOpenDebt = { nav.navigate("debt") },
+                                            onAddDebt  = { nav.navigate("debt?autoAdd=true") }
                                         )
                                     }
+                                }
+                                composable(
+                                    "debt?autoAdd={autoAdd}",
+                                    arguments = listOf(androidx.navigation.navArgument("autoAdd") {
+                                        defaultValue = false
+                                        type = androidx.navigation.NavType.BoolType
+                                    }),
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) { backStack ->
+                                    val autoAdd = backStack.arguments?.getBoolean("autoAdd") ?: false
+                                    com.example.wealthtracker.ui.screens.DebtTrackerScreen(
+                                        onBack = { nav.popBackStack() },
+                                        autoOpenAdd = autoAdd
+                                    )
                                 }
                                 composable(
                                     "stocks",
@@ -606,6 +635,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+            } // end CompositionLocalProvider(LocalActivity)
         }
     }
 

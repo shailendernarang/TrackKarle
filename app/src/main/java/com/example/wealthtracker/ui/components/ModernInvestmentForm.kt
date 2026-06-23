@@ -32,24 +32,10 @@ import com.example.wealthtracker.util.FormatUtils
 import com.example.wealthtracker.util.IndianBanks
 import java.text.SimpleDateFormat
 import java.util.*
-import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
 import androidx.compose.ui.text.TextRange
 
-// Helper functions for Indian number formatting
-private fun formatIndianNumber(input: String): String {
-    val clean = input.replace(",", "").trim()
-    if (clean.isBlank()) return ""
-    val parts = clean.split('.')
-    val intPart = parts.getOrNull(0)?.filter { it.isDigit() } ?: ""
-    val decPart = parts.getOrNull(1)?.filter { it.isDigit() } ?: ""
-    val num = intPart.toLongOrNull() ?: return ""
-    val dfs = DecimalFormatSymbols(Locale("en", "IN"))
-    val df = DecimalFormat("#,##,##0").apply { decimalFormatSymbols = dfs }
-    var res = df.format(num)
-    if (decPart.isNotEmpty()) res += "." + decPart.take(2)
-    return res
-}
+// Delegates to FormatUtils so grouping matches the user's selected country
+private fun formatIndianNumber(input: String): String = FormatUtils.formatAmountInput(input)
 
 private fun formatIndianNumberTF(input: TextFieldValue): TextFieldValue {
     val formatted = formatIndianNumber(input.text)

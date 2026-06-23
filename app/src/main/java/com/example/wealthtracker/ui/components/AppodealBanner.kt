@@ -10,67 +10,80 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.appodeal.ads.Appodeal
+import com.appodeal.ads.NativeAd
+import com.appodeal.ads.nativead.NativeAdViewNewsFeed
+
+@Composable
+fun AppodealNativeNewsFeed(
+    modifier: Modifier = Modifier
+) {
+    var nativeAd by remember { mutableStateOf<NativeAd?>(null) }
+
+    LaunchedEffect(Unit) {
+        // Poll until a native ad is available (max ~15s)
+        repeat(10) { attempt ->
+            kotlinx.coroutines.delay(if (attempt == 0) 4000L else 1000L)
+            val ads = Appodeal.getNativeAds(1)
+            Log.d("NativeAd", "attempt $attempt — available=${Appodeal.getAvailableNativeAdsCount()}, got=${ads.size}")
+            if (ads.isNotEmpty()) {
+                nativeAd = ads[0]
+                return@LaunchedEffect
+            }
+        }
+    }
+
+    val ad = nativeAd ?: return
+
+    AndroidView(
+        factory = { ctx ->
+            NativeAdViewNewsFeed(ctx).also { view ->
+                view.registerView(ad, "default")
+                Log.d("NativeAd", "NativeAdViewNewsFeed registered")
+            }
+        },
+        modifier = modifier.fillMaxWidth()
+    )
+}
 
 /**
- * Appodeal Banner Ad Component
+ * Appodeal Banner Ad Component using BannerView approach.
  *
- * Per Appodeal SDK documentation:
- * - getBannerView(activity) requires Activity context
- * - show(activity, BANNER_VIEW) requires Activity context
- * - BannerView is a shared singleton — must detach from old parent before reattaching
- *
- * @param activity The Activity context required by Appodeal SDK
- * @param modifier Compose modifier for layout
+ * Renders the BannerView immediately and calls show() — the SDK internally
+ * handles caching. We add a short startup delay so the SDK finishes
+ * initializing before we attach the view.
  */
 @Composable
 fun AppodealBanner(
     activity: Activity,
     modifier: Modifier = Modifier
 ) {
-    // Track if SDK is initialized - show banner immediately once initialized
-    var isSdkInitialized by remember { mutableStateOf(Appodeal.isInitialized(Appodeal.BANNER)) }
-    
-    // Wait for SDK initialization only (not for each ad load)
+    // Delay briefly so the SDK completes initialization before attaching the view
+    var delayDone by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        if (!isSdkInitialized) {
-            var attempts = 0
-            while (attempts < 50) { // Wait up to 10 seconds (50 * 200ms)
-                if (Appodeal.isInitialized(Appodeal.BANNER)) {
-                    Log.d("AppodealBanner", "🎯 SDK initialized after ${attempts * 200}ms")
-                    isSdkInitialized = true
-                    break
-                }
-                kotlinx.coroutines.delay(200)
-                attempts++
-            }
-            if (attempts >= 50) {
-                Log.w("AppodealBanner", "⚠️ SDK not initialized after 10 seconds")
-            }
-        }
+        kotlinx.coroutines.delay(3500) // 3.5s covers SDK init (~2-3s)
+        delayDone = true
+        Log.d("AppodealBanner", "startup delay done, isLoaded(BANNER)=${Appodeal.isLoaded(Appodeal.BANNER)}")
     }
-    
-    // Show banner space once SDK is initialized (banner view is shared singleton)
-    if (isSdkInitialized) {
+
+    if (delayDone) {
         AndroidView(
             factory = { _ ->
-                Log.d("AppodealBanner", "🏗️ Factory: Creating BannerView")
-                // Per Appodeal docs: getBannerView() requires Activity
+                Log.d("AppodealBanner", "Factory: getBannerView")
                 val bannerView = Appodeal.getBannerView(activity)
-                
-                // BannerView is a shared singleton — detach from old parent first
-                val hadParent = bannerView.parent != null
+                // BannerView is a shared singleton — detach from any previous parent first
                 (bannerView.parent as? ViewGroup)?.removeView(bannerView)
-                Log.d("AppodealBanner", "🏗️ BannerView created (had parent: $hadParent)")
+                // Force full-width so the creative stretches edge-to-edge
+                bannerView.layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
                 bannerView
             },
             update = { _ ->
-                // Always call show() - SDK handles whether ad is available
                 val shown = Appodeal.show(activity, Appodeal.BANNER_VIEW)
-                Log.d("AppodealBanner", "✅ show() called, result=$shown, isLoaded=${Appodeal.isLoaded(Appodeal.BANNER)}")
+                Log.d("AppodealBanner", "show(BANNER_VIEW) result=$shown isLoaded=${Appodeal.isLoaded(Appodeal.BANNER)}")
             },
             modifier = modifier
-                .fillMaxWidth()
-                .height(90.dp)
         )
     }
 }
