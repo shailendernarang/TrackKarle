@@ -30,6 +30,24 @@ val CompactTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 28.sp
     ),
+    headlineLarge = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 28.sp,
+        lineHeight = 36.sp
+    ),
+    headlineMedium = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 24.sp,
+        lineHeight = 32.sp
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 20.sp,
+        lineHeight = 28.sp
+    ),
     bodyLarge = TextStyle(
         fontFamily = Montserrat,
         fontWeight = FontWeight.Normal,
@@ -61,10 +79,21 @@ val CompactTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp
     ),
+    titleSmall = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 13.sp
+    ),
     labelLarge = TextStyle(
         fontFamily = Montserrat,
         fontWeight = FontWeight.SemiBold,
         fontSize = 13.sp
+    ),
+    labelMedium = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        letterSpacing = 0.3.sp
     ),
     labelSmall = TextStyle(
         fontFamily = Montserrat,
@@ -89,6 +118,24 @@ val Typography = Typography(
         fontFamily = Montserrat,
         fontWeight = FontWeight.SemiBold,
         fontSize = 34.sp
+    ),
+    headlineLarge = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 32.sp,
+        lineHeight = 40.sp
+    ),
+    headlineMedium = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 28.sp,
+        lineHeight = 36.sp
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 24.sp,
+        lineHeight = 32.sp
     ),
     bodyLarge = TextStyle(
         fontFamily = Montserrat,
@@ -121,10 +168,21 @@ val Typography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp
     ),
+    titleSmall = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp
+    ),
     labelLarge = TextStyle(
         fontFamily = Montserrat,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp
+    ),
+    labelMedium = TextStyle(
+        fontFamily = Montserrat,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        letterSpacing = 0.3.sp
     ),
     labelSmall = TextStyle(
         fontFamily = Montserrat,

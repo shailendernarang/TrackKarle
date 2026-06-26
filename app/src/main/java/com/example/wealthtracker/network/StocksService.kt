@@ -22,6 +22,12 @@ interface StocksService {
         @Query("interval") interval: String = "1d"
     ): ChartResponse
 
+    @GET("v10/finance/quoteSummary/{symbol}")
+    suspend fun quoteSummary(
+        @retrofit2.http.Path("symbol") symbol: String,
+        @Query("modules") modules: String = "assetProfile"
+    ): QuoteSummaryResponse
+
     // Search company names to resolve Yahoo symbols
     @GET("v1/finance/search")
     suspend fun search(
@@ -42,10 +48,18 @@ data class QuoteResult(val result: List<QuoteItem> = emptyList())
 data class QuoteItem(
     val symbol: String?,
     val longName: String?,
+    val shortName: String?,
     val regularMarketPrice: Double?,
     val regularMarketChange: Double?,
     val regularMarketChangePercent: Double?,
     val regularMarketPreviousClose: Double?,
+    val regularMarketOpen: Double?,
+    val regularMarketDayHigh: Double?,
+    val regularMarketDayLow: Double?,
+    val regularMarketVolume: Long?,
+    val marketCap: Long?,
+    val exchange: String?,
+    val financialCurrency: String?,
     // Pre/post-market fields (null when market is in REGULAR session)
     val preMarketPrice: Double?,
     val preMarketChange: Double?,
@@ -75,7 +89,13 @@ data class ChartMeta(
 
 data class Indicators(val quote: List<IndicatorQuote> = emptyList())
 
-data class IndicatorQuote(val close: List<Double?> = emptyList())
+data class IndicatorQuote(
+    val open: List<Double?> = emptyList(),
+    val high: List<Double?> = emptyList(),
+    val low: List<Double?> = emptyList(),
+    val close: List<Double?> = emptyList(),
+    val volume: List<Long?> = emptyList()
+)
 
 // --- Search response (minimal) ---
 data class SearchResponse(val quotes: List<SearchQuote> = emptyList())
@@ -84,6 +104,25 @@ data class SearchQuote(
     val longname: String?,
     val shortname: String?,
     val exchDisp: String?
+)
+
+// --- Quote Summary (company profile) ---
+data class QuoteSummaryResponse(
+    val quoteSummary: QuoteSummaryResult? = null
+)
+data class QuoteSummaryResult(
+    val result: List<QuoteSummaryEntry> = emptyList()
+)
+data class QuoteSummaryEntry(
+    val assetProfile: AssetProfile? = null
+)
+data class AssetProfile(
+    val longBusinessSummary: String? = null,
+    val sector: String? = null,
+    val industry: String? = null,
+    val country: String? = null,
+    val website: String? = null,
+    val fullTimeEmployees: Long? = null
 )
 
 object StocksApiProvider {

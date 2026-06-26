@@ -12,16 +12,24 @@ object MarketHours {
     )
 
     private val byCountry = mapOf(
-        "IN" to Exchange("Asia/Kolkata",      9, 15, 15, 30),  // NSE/BSE
-        "US" to Exchange("America/New_York",  9, 30, 16,  0),  // NYSE/NASDAQ
-        "GB" to Exchange("Europe/London",     8,  0, 16, 30),  // LSE
-        "JP" to Exchange("Asia/Tokyo",        9,  0, 15, 30),  // TSE/Nikkei
-        "HK" to Exchange("Asia/Hong_Kong",    9, 30, 16,  0),  // HKEX
-        "DE" to Exchange("Europe/Berlin",     9,  0, 17, 30),  // XETRA/DAX
-        "FR" to Exchange("Europe/Paris",      9,  0, 17, 30),  // Euronext/CAC
-        "AU" to Exchange("Australia/Sydney", 10,  0, 16,  0),  // ASX
-        "CN" to Exchange("Asia/Shanghai",     9, 30, 15,  0),  // SSE/Shanghai
-        "CA" to Exchange("America/Toronto",   9, 30, 16,  0),  // TSX
+        "IN" to Exchange("Asia/Kolkata",        9, 15, 15, 30),  // NSE/BSE
+        "US" to Exchange("America/New_York",    9, 30, 16,  0),  // NYSE/NASDAQ
+        "GB" to Exchange("Europe/London",       8,  0, 16, 30),  // LSE
+        "JP" to Exchange("Asia/Tokyo",          9,  0, 15, 30),  // TSE
+        "HK" to Exchange("Asia/Hong_Kong",      9, 30, 16,  0),  // HKEX
+        "DE" to Exchange("Europe/Berlin",       9,  0, 17, 30),  // XETRA
+        "FR" to Exchange("Europe/Paris",        9,  0, 17, 30),  // Euronext
+        "AU" to Exchange("Australia/Sydney",   10,  0, 16,  0),  // ASX
+        "CN" to Exchange("Asia/Shanghai",       9, 30, 15,  0),  // SSE
+        "CA" to Exchange("America/Toronto",     9, 30, 16,  0),  // TSX
+        "SG" to Exchange("Asia/Singapore",      9,  0, 17,  0),  // SGX
+        "KR" to Exchange("Asia/Seoul",          9,  0, 15, 30),  // KRX
+        "TW" to Exchange("Asia/Taipei",         9,  0, 13, 30),  // TWSE
+        "NZ" to Exchange("Pacific/Auckland",   10,  0, 17,  0),  // NZX
+        "CH" to Exchange("Europe/Zurich",       9,  0, 17, 30),  // SIX Swiss
+        "SE" to Exchange("Europe/Stockholm",    9,  0, 17, 30),  // Nasdaq Nordic
+        "NO" to Exchange("Europe/Oslo",         9,  0, 16, 20),  // Oslo Bors
+        "DK" to Exchange("Europe/Copenhagen",   9,  0, 17,  0),  // Nasdaq Copenhagen
     )
 
     private fun isOpen(ex: Exchange): Boolean {

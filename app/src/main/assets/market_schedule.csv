@@ -1,0 +1,70 @@
+# Time-based symbol routing per country.
+# Times are always in IST (Asia/Kolkata) — the code converts device localtime → IST.
+# start_ist / end_ist: HH:MM (24h). Overnight slots wrap midnight (e.g. 23:30–05:30).
+# p1–p4: yahoo_symbol from market_config.csv. Shown left→right in ticker.
+country_code,slot_id,start_ist,end_ist,p1,p2,p3,p4
+# ── India (PRD v1.3) ─────────────────────────────────────────────────────────
+# 05:30–09:00  Pre-open: Asia-Pacific setting the tone for Indian open
+# Note: GIFT NIFTY not listed on Yahoo Finance; ^NSEI used as proxy with label override
+IN,EARLY_ASIA,05:30,09:00,^NSEI,^N225,^GSPC,^HSI
+# 09:00–15:30  Core NSE equity session + MCX Gold live
+IN,CORE_EQUITY,09:00,15:30,^NSEI,^BSESN,^NSEBANK,GC=F
+# 15:30–19:30  European + early MCX commodity session
+IN,EURO_COMMODITY,15:30,19:30,^GDAXI,GC=F,HG=F,^NSEI
+# 19:30–23:30  US core equity + MCX metals peak
+IN,US_METALS,19:30,23:30,^NDX,^GSPC,SI=F,HG=F
+# 23:30–05:30  Overnight: US closing snapshot + gold
+IN,OVERNIGHT,23:30,05:30,^GSPC,^DJI,GC=F,^N225
+# ── United States ─────────────────────────────────────────────────────────────
+# 09:30–19:00 IST  European markets open, NYSE pre-market
+US,GLOBAL_SESSION,09:30,19:00,^GDAXI,^FTSE,^FCHI,^N225
+# 19:00–01:30 IST  NYSE/NASDAQ core session (09:30–16:00 ET)
+US,MARKET_HOURS,19:00,01:30,^GSPC,^IXIC,^DJI,^RUT
+# 01:30–09:30 IST  Overnight: US closed, Asia opening
+US,OVERNIGHT,01:30,09:30,^GSPC,^IXIC,^N225,^HSI
+# ── United Kingdom ────────────────────────────────────────────────────────────
+# 01:30–12:30 IST  Overnight & Asia session (before LSE opens ~12:30 IST / 08:00 BST)
+GB,ASIA_CLOSE,01:30,12:30,^N225,^HSI,000001.SS,^AXJO
+# 12:30–19:00 IST  LSE core session (08:00–16:30 BST), before NYSE opens
+GB,LSE_OPEN,12:30,19:00,^FTSE,^FTMC,^GDAXI,^FCHI
+# 19:00–21:00 IST  LSE + NYSE overlap (09:30 ET open, LSE still live)
+GB,DUAL_SESSION,19:00,21:00,^FTSE,^GSPC,^GDAXI,^IXIC
+# 21:00–01:30 IST  LSE closed, US in full swing
+GB,US_SESSION,21:00,01:30,^GSPC,^IXIC,^DJI,^FTSE
+# ── Japan ─────────────────────────────────────────────────────────────────────
+JP,DEFAULT,00:00,23:59,^N225,^HSI,^GSPC,^IXIC
+# ── Australia ─────────────────────────────────────────────────────────────────
+# 05:30–12:00 IST  ASX open (10:00–16:00 AEST), NZX active
+AU,ASX_OPEN,05:30,12:00,^AXJO,^NZ50,^N225,^HSI
+# 12:00–19:00 IST  Asia closing, Europe opening
+AU,ASIA_EUROPE,12:00,19:00,^N225,^HSI,^GDAXI,^FTSE
+# 19:00–01:30 IST  US session (09:30–16:00 ET)
+AU,US_SESSION,19:00,01:30,^GSPC,^IXIC,^DJI,^AXJO
+# 01:30–05:30 IST  Overnight: all major markets closed
+AU,OVERNIGHT,01:30,05:30,^N225,^HSI,^GSPC,^AXJO
+# ── New Zealand ────────────────────────────────────────────────────────────────
+NZ,DEFAULT,00:00,23:59,^NZ50,^AXJO,^GSPC,^IXIC
+# ── Singapore ──────────────────────────────────────────────────────────────────
+SG,DEFAULT,00:00,23:59,^STI,^HSI,000001.SS,^GSPC
+# ── Canada ─────────────────────────────────────────────────────────────────────
+CA,DEFAULT,00:00,23:59,^GSPTSE,^GSPC,^IXIC,^DJI
+# ── South Korea ────────────────────────────────────────────────────────────────
+KR,DEFAULT,00:00,23:59,^KS11,^KQ11,000001.SS,^GSPC
+# ── China ──────────────────────────────────────────────────────────────────────
+CN,DEFAULT,00:00,23:59,000001.SS,399001.SZ,^HSI,^GSPC
+# ── Hong Kong ──────────────────────────────────────────────────────────────────
+HK,DEFAULT,00:00,23:59,^HSI,000001.SS,399001.SZ,^GSPC
+# ── Taiwan ─────────────────────────────────────────────────────────────────────
+TW,DEFAULT,00:00,23:59,^TWII,^HSI,000001.SS,^GSPC
+# ── Germany / EU (shared) ──────────────────────────────────────────────────────
+DE,DEFAULT,00:00,23:59,^GDAXI,^FCHI,^STOXX50E,^GSPC
+# ── Switzerland ────────────────────────────────────────────────────────────────
+CH,DEFAULT,00:00,23:59,^SSMI,^GDAXI,^FTSE,^GSPC
+# ── Sweden ─────────────────────────────────────────────────────────────────────
+SE,DEFAULT,00:00,23:59,^OMX,^GDAXI,^FTSE,^GSPC
+# ── Norway ─────────────────────────────────────────────────────────────────────
+NO,DEFAULT,00:00,23:59,OBX.OL,^GDAXI,^FTSE,^GSPC
+# ── Denmark ────────────────────────────────────────────────────────────────────
+DK,DEFAULT,00:00,23:59,^OMXC25,^GDAXI,^FTSE,^GSPC
+# ── Fallback for all other countries ───────────────────────────────────────────
+DEFAULT,DEFAULT,00:00,23:59,^GSPC,^IXIC,^DJI,^GDAXI

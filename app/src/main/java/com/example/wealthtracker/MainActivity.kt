@@ -56,6 +56,8 @@ import com.example.wealthtracker.ui.InvestmentViewModel
 import com.example.wealthtracker.ui.DebtViewModel
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.flow.first
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.wealthtracker.ui.theme.WealthTrackerTheme
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -108,6 +110,7 @@ import com.example.wealthtracker.ui.components.RatingPromptManager
 import com.example.wealthtracker.util.BiometricUtils
 import com.example.wealthtracker.ui.components.PrivacyConsentDialog
 import com.example.wealthtracker.ui.components.PrivacyPreferences
+import com.example.wealthtracker.util.MarketWebSocket
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -118,7 +121,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         
         // Initialize Appodeal SDK for ads
-        Appodeal.setTesting(false)
+        Appodeal.setTesting(BuildConfig.DEBUG)
         Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.none)
         
         // Smart banners fill the full screen width instead of the fixed 320dp standard
@@ -665,8 +668,19 @@ private fun WithLocalizedContext(useHindiNumerals: Boolean, content: @Composable
     }
 }
 
+    override fun onStart() {
+        super.onStart()
+        // Pre-load CSV config so it's ready when MarketIndicesMarquee renders.
+        // WS symbols + connect are owned by MarketIndicesMarquee (country-filtered).
+        lifecycleScope.launch(Dispatchers.IO) {
+            com.example.wealthtracker.util.MarketSchedule.load(applicationContext)
+        }
+    }
+
     override fun onStop() {
         super.onStop()
+        // Only disconnect when truly going to background — not during screen rotation
+        if (!isChangingConfigurations) MarketWebSocket.disconnect()
         // Apply pending locale in background so next resume shows updated language without flicker
         pendingLocaleTag?.let { tag ->
             val toApply = LocaleListCompat.forLanguageTags(tag)

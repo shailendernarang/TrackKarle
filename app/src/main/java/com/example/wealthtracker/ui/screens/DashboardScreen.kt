@@ -50,6 +50,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.ImageLoader
 import coil.decode.SvgDecoder
+import com.example.wealthtracker.ui.components.AnimatedPriceText
 import com.example.wealthtracker.ui.components.AppodealBanner
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,9 +66,15 @@ import com.example.wealthtracker.ui.components.MarketIndex
 import com.example.wealthtracker.ui.components.ReturnsInsightsCard
 import com.example.wealthtracker.ui.components.PortfolioAllocationSection
 import androidx.compose.material.icons.filled.CreditCard
+import android.util.Log
 import com.example.wealthtracker.network.StocksApiProvider
 import com.example.wealthtracker.util.MarketHours
+import com.example.wealthtracker.util.MarketWebSocket
 import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import com.example.wealthtracker.util.LocalActivity
 
 // In-memory cache for country-specific market indices used in daily return calculation
 private object DashboardMarketCache {
@@ -137,9 +144,50 @@ fun DashboardScreen(
     var marketIndices by remember { mutableStateOf(DashboardMarketCache.indices) }
     var showReportsSheet by remember { mutableStateOf(false) }
 
+    val activityLifecycle = (LocalActivity.current as? LifecycleOwner)?.lifecycle
+    var isForegrounded by remember { mutableStateOf(true) }
+    DisposableEffect(activityLifecycle) {
+        val lc = activityLifecycle ?: return@DisposableEffect onDispose {}
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> { isForegrounded = true;  Log.d("DashboardMarket", "foregrounded — resuming polls") }
+                Lifecycle.Event.ON_STOP  -> { isForegrounded = false; Log.d("DashboardMarket", "backgrounded — pausing polls") }
+                else -> {}
+            }
+        }
+        lc.addObserver(observer)
+        onDispose { lc.removeObserver(observer) }
+    }
+
+    val countryCode = remember { UserPreferences(ctx).getCountryCode() }
+    val symbolPairs = remember(countryCode) { marketSymbolsForCountry(countryCode) }
+
+    LaunchedEffect(isForegrounded) {
+        if (isForegrounded) {
+            MarketWebSocket.updateSymbols(symbolPairs.map { it.first })
+            MarketWebSocket.connect()
+            Log.d("DashboardMarket", "WS reconnecting after foreground")
+        }
+    }
+
+    val wsTicks by MarketWebSocket.ticks.collectAsState()
+    LaunchedEffect(wsTicks) {
+        if (wsTicks.isEmpty() || marketIndices.isEmpty()) return@LaunchedEffect
+        val updated = marketIndices.map { idx ->
+            val tick = wsTicks[idx.symbol] ?: return@map idx
+            idx.copy(
+                price = tick.price.toDouble(),
+                change = tick.change.toDouble(),
+                changePercent = tick.changePercent.toDouble()
+            )
+        }
+        if (updated != marketIndices) {
+            marketIndices = updated
+            DashboardMarketCache.indices = updated
+        }
+    }
+
     LaunchedEffect(Unit) {
-        val countryCode = UserPreferences(ctx).getCountryCode()
-        val symbolPairs = marketSymbolsForCountry(countryCode)
         val symbolToName = symbolPairs.toMap()
 
         suspend fun fetch() {
@@ -169,16 +217,23 @@ fun DashboardScreen(
                     DashboardMarketCache.indices = ordered
                     marketIndices = ordered
                 }
+            }.onFailure { e ->
+                val tag = if (e is java.net.UnknownHostException) "no network (Doze/offline)" else "fetch failed"
+                Log.e("DashboardMarket", "$tag — ${e::class.simpleName}: ${e.message}")
             }
         }
 
         // Initial fetch (use cache if available)
         if (marketIndices.isEmpty()) fetch()
 
-        // Refresh every 5 minutes while the primary exchange is open
         while (true) {
-            delay(5 * 60 * 1000L)
-            if (MarketHours.isMarketOpen(countryCode)) fetch()
+            val delayMs = when {
+                !isForegrounded                        -> 5 * 60 * 1000L   // background: Doze-friendly
+                MarketHours.isMarketOpen(countryCode) -> 60_000L
+                else                                   -> 15 * 60 * 1000L
+            }
+            delay(delayMs)
+            if (isForegrounded) fetch()
         }
     }
 
@@ -1025,10 +1080,13 @@ private fun MarketCarouselCard(index: MarketIndex) {
                     )
                 }
             }
-            Text(
-                String.format("%.2f", displayPrice),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
+            AnimatedPriceText(
+                text     = String.format("%.2f", displayPrice),
+                isRising = isPositive,
+                style    = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             )
             Surface(color = changeBg, shape = RoundedCornerShape(6.dp)) {
                 Text(
