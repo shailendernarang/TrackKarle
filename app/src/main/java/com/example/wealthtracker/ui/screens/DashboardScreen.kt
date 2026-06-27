@@ -52,6 +52,8 @@ import coil.ImageLoader
 import coil.decode.SvgDecoder
 import com.example.wealthtracker.ui.components.AnimatedPriceText
 import com.example.wealthtracker.ui.components.AppodealBanner
+import com.example.wealthtracker.ui.components.AppodealMrec
+import com.example.wealthtracker.ui.components.AppodealNativeNewsFeed
 import com.example.wealthtracker.ui.components.AppBottomNavBar
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -367,6 +369,9 @@ fun DashboardScreen(
                     com.example.wealthtracker.ui.components.PortfolioAnalysisCard(investments = allItems)
                 }
 
+                // Banner ad after Smart Insights
+                AppodealNativeNewsFeed()
+
                 // ⑥ Filters — moved below insights
                 if (allItems.isNotEmpty()) {
                     Text(
@@ -455,6 +460,14 @@ fun DashboardScreen(
                             Text("Track your loans & EMIs", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
                         }
+                    }
+                }
+
+                // MREC ad when portfolio is empty
+                if (allItems.isEmpty()) {
+                    val mrecActivity = ctx.findActivity()
+                    if (mrecActivity != null) {
+                        AppodealMrec(activity = mrecActivity)
                     }
                 }
 

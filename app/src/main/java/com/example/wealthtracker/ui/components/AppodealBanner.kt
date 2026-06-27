@@ -12,6 +12,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.appodeal.ads.Appodeal
 import com.appodeal.ads.NativeAd
 import com.appodeal.ads.nativead.NativeAdViewNewsFeed
+import androidx.compose.foundation.layout.wrapContentHeight
 
 @Composable
 fun AppodealNativeNewsFeed(
@@ -84,6 +85,43 @@ fun AppodealBanner(
                 Log.d("AppodealBanner", "show(BANNER_VIEW) result=$shown isLoaded=${Appodeal.isLoaded(Appodeal.BANNER)}")
             },
             modifier = modifier
+        )
+    }
+}
+
+/**
+ * Appodeal MREC (Medium Rectangle 300×250) ad component.
+ * Centered on screen, fills width, wraps height to 250dp creative.
+ */
+@Composable
+fun AppodealMrec(
+    activity: Activity,
+    modifier: Modifier = Modifier
+) {
+    var delayDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(3500)
+        delayDone = true
+        Log.d("AppodealMrec", "startup delay done, isLoaded(MREC)=${Appodeal.isLoaded(Appodeal.MREC)}")
+    }
+
+    if (delayDone) {
+        AndroidView(
+            factory = { _ ->
+                Log.d("AppodealMrec", "Factory: getMrecView")
+                val mrecView = Appodeal.getMrecView(activity)
+                (mrecView.parent as? ViewGroup)?.removeView(mrecView)
+                mrecView.layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                mrecView
+            },
+            update = { _ ->
+                val shown = Appodeal.show(activity, Appodeal.MREC)
+                Log.d("AppodealMrec", "show(MREC) result=$shown")
+            },
+            modifier = modifier.fillMaxWidth().wrapContentHeight()
         )
     }
 }

@@ -569,8 +569,11 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
 
                 // Market news
                 CompactNewsSection("Market News", marketNews)
+                com.example.wealthtracker.ui.components.AppodealNativeNewsFeed()
 
                 CompactNewsSection("Top 10 Stocks", top10News)
+                com.example.wealthtracker.ui.components.AppodealNativeNewsFeed()
+
                 CompactNewsSection("Top 10 Penny Stocks", pennyNews)
 
             } // end scroll Column

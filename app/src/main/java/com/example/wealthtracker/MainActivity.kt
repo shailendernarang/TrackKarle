@@ -125,8 +125,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         
         // Initialize Appodeal SDK for ads
+        // Always true in debug so test ads fill during development
         Appodeal.setTesting(BuildConfig.DEBUG)
-        Appodeal.setLogLevel(com.appodeal.ads.utils.Log.LogLevel.none)
+        Appodeal.setLogLevel(
+            if (BuildConfig.DEBUG) com.appodeal.ads.utils.Log.LogLevel.verbose
+            else com.appodeal.ads.utils.Log.LogLevel.none
+        )
         
         // Smart banners fill the full screen width instead of the fixed 320dp standard
         Appodeal.setSmartBanners(true)
@@ -145,7 +149,7 @@ class MainActivity : AppCompatActivity() {
         Appodeal.initialize(
             this,
             com.ss.wealthtracker.BuildConfig.APPODEAL_API_KEY,
-            Appodeal.BANNER or Appodeal.NATIVE,
+            Appodeal.BANNER or Appodeal.NATIVE or Appodeal.MREC,
             object : ApdInitializationCallback {
                 override fun onInitializationFinished(errors: List<ApdInitializationError>?) {
                     if (BuildConfig.DEBUG) {
@@ -155,8 +159,9 @@ class MainActivity : AppCompatActivity() {
                         Log.d("Appodeal", "Auto-cache BANNER: ${Appodeal.isAutoCacheEnabled(Appodeal.BANNER)}")
                         Log.d("Appodeal", "Auto-cache NATIVE: ${Appodeal.isAutoCacheEnabled(Appodeal.NATIVE)}")
                     }
-                    // Explicitly cache native ads — auto-cache doesn't always trigger for native
+                    // Explicitly cache native and MREC ads
                     Appodeal.cache(this@MainActivity, Appodeal.NATIVE)
+                    Appodeal.cache(this@MainActivity, Appodeal.MREC)
                 }
             }
         )

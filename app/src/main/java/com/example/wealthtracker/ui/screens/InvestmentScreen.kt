@@ -24,6 +24,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -1458,17 +1459,21 @@ fun InvestmentScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             if (items.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(8.dp))
-                        Text(stringResource(R.string.empty_no_investments), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.empty_no_investments), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(24.dp))
+                    com.example.wealthtracker.ui.components.AppodealNativeNewsFeed()
                 }
             } else {
                 if (isCompact) {
                     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 96.dp).bringIntoViewRequester(listBring)) {
-                        items.forEach { item ->
+                        items.forEachIndexed { idx, item ->
+                            // Native ad every 5 items
+                            if (idx > 0 && idx % 5 == 0) {
+                                com.example.wealthtracker.ui.components.AppodealNativeNewsFeed()
+                            }
                             Box(modifier = Modifier) {
                                 InvestmentRow(
                                     entity = item,
@@ -1508,7 +1513,11 @@ fun InvestmentScreen(
                         contentPadding = PaddingValues(bottom = 96.dp),
                         state = listState
                     ) {
-                        items(items, key = { item -> item.id }) { item ->
+                        itemsIndexed(items, key = { _, item -> item.id }) { idx, item ->
+                            // Native ad every 5 items
+                            if (idx > 0 && idx % 5 == 0) {
+                                com.example.wealthtracker.ui.components.AppodealNativeNewsFeed()
+                            }
                             Box(modifier = Modifier) {
                                 InvestmentRow(
                                     entity = item,

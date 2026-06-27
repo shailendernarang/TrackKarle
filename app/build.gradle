@@ -47,8 +47,8 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 27160000
-        versionName "27.16.0"
+        versionCode 27180000
+        versionName "27.18.0"
 
         buildConfigField 'String', 'RATES_URL', '"https://api.example.com/wealthtracker/avg_rates.json"'
         buildConfigField 'String', 'APPODEAL_API_KEY', '"' + (localProperties['appodeal.api.key'] ?: '') + '"'
@@ -178,16 +178,38 @@ dependencies {
 
     // Appodeal Ads SDK (includes built-in CMP for GDPR consent)
     implementation 'com.appodeal.ads.sdk:core:4.2.0'
-    
-    // Appodeal Network Adapters (AdMob removed - account banned)
-    implementation 'com.appodeal.ads.sdk.adapters:applovin:13.5.1.0'
-    implementation 'com.appodeal.ads.sdk.adapters:bidmachine:3.6.1.0'
-    implementation 'com.appodeal.ads.sdk.adapters:meta:6.20.0.0'
-    implementation 'com.appodeal.ads.sdk.adapters:unity_ads:4.16.4.0'
-    implementation 'com.appodeal.ads.sdk.adapters:inmobi:11.1.0.0'
-    implementation 'com.appodeal.ads.sdk.adapters:iab:1.8.1.0'
-    implementation 'com.appodeal.ads.sdk.adapters:bidon:0.13.0.0'
-    implementation 'com.appodeal.ads.sdk.adapters:yandex:7.18.2.0'
+
+    // ── Appodeal Network Adapters ─────────────────────────────────────────────
+    // Tier 1 — highest eCPM + fill in India (must have)
+    // AdMob excluded — account banned
+    implementation 'com.appodeal.ads.sdk.adapters:applovin:13.5.1.0'       // AppLovin — strong India + global fill
+    implementation 'com.appodeal.ads.sdk.adapters:applovin_max:13.5.1.1'   // AppLovin MAX in-app bidding
+    implementation 'com.appodeal.ads.sdk.adapters:meta:6.21.0.0'           // Meta/Facebook — top eCPM in India
+    implementation 'com.appodeal.ads.sdk.adapters:unity_ads:4.17.0.0'      // Unity Ads — high fill on finance apps
+    implementation 'com.appodeal.ads.sdk.adapters:mintegral:17.1.61.0'     // Mintegral — strong in Asia-Pacific
+    implementation 'com.appodeal.ads.sdk.adapters:inmobi:11.1.0.0'         // InMobi — India-headquartered, deep India fill
+    implementation 'com.appodeal.ads.sdk.adapters:ironsource:9.1.0.0'      // IronSource — large global demand
+    implementation 'com.appodeal.ads.sdk.adapters:level_play:9.1.0.0'      // IronSource LevelPlay in-app bidding
+
+    // Tier 2 — programmatic + header bidding (boosts floor price)
+    implementation 'com.appodeal.ads.sdk.adapters:bidmachine:3.7.1.0'      // BidMachine — RTB demand, increases floor
+    implementation 'com.appodeal.ads.sdk.adapters:amazon:11.3.0.0'         // Amazon TAM — strong in India (Prime users)
+    implementation 'com.appodeal.ads.sdk.adapters:pubmatic:4.10.0.0'       // PubMatic — header bidding, India strong
+    implementation 'com.appodeal.ads.sdk.adapters:vungle:7.6.1.0'          // Liftoff/Vungle — good video fill
+    implementation 'com.appodeal.ads.sdk.adapters:my_target:5.47.1.0'      // MyTarget/VK Ads — emerging market fill
+    implementation 'com.appodeal.ads.sdk.adapters:ogury:6.2.0.0'           // Ogury — high-quality targeted, good eCPM
+    implementation 'com.appodeal.ads.sdk.adapters:dt_exchange:8.4.1.0'     // DT Exchange (Fyber) — programmatic demand
+    implementation 'com.appodeal.ads.sdk.adapters:yandex:7.17.0.0'         // Yandex — strong in IN + Eastern Europe
+
+    // Tier 3 — incremental fill (add demand without major conflicts)
+    implementation 'com.appodeal.ads.sdk.adapters:bidon:0.14.0.0'          // Bidon — open-source in-app bidding layer
+    implementation 'com.appodeal.ads.sdk.adapters:iab:1.8.1.0'             // IAB — consent + standard signals
+
+    // Attribution & analytics adapters (improves targeting accuracy → higher eCPM)
+    implementation 'com.appodeal.ads.sdk.adapters:adjust:5.4.6.1'          // Adjust attribution
+    implementation 'com.appodeal.ads.sdk.adapters:appsflyer:6.18.0.1'      // AppsFlyer attribution
+    implementation 'com.appodeal.ads.sdk.adapters:facebook_analytics:18.0.3.0' // Meta events bridge
+    // firebase adapter omitted — Firebase BOM already declared directly above, avoids version conflict
 
     // Firebase (BOM pinned to latest stable to pick security fixes)
     implementation platform('com.google.firebase:firebase-bom:33.16.0')

@@ -364,6 +364,11 @@ private fun AddInvHomePage(
                 items(popularInvestments) { item ->
                     TypeListItem(item, onClick = { onTypeSelected(item.investmentType, item.preOthersName) })
                 }
+                item {
+                    com.example.wealthtracker.ui.components.AppodealNativeNewsFeed(
+                        modifier = androidx.compose.ui.Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
             }
         }
     }

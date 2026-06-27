@@ -25,6 +25,8 @@ import com.example.wealthtracker.util.BiometricUtils
 import com.example.wealthtracker.analytics.AnalyticsManager
 import com.example.wealthtracker.analytics.TrackScreen
 import com.example.wealthtracker.ui.components.AppBottomNavBar
+import com.example.wealthtracker.ui.components.AppodealMrec
+import com.example.wealthtracker.util.findActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -265,6 +267,14 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // MREC ad at the bottom of settings
+            val settingsActivity = LocalContext.current.findActivity()
+            if (settingsActivity != null) {
+                AppodealMrec(activity = settingsActivity)
             }
 
             Spacer(Modifier.height(32.dp))
