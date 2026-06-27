@@ -47,8 +47,8 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 27120000
-        versionName "27.12.0"
+        versionCode 27160000
+        versionName "27.16.0"
 
         buildConfigField 'String', 'RATES_URL', '"https://api.example.com/wealthtracker/avg_rates.json"'
         buildConfigField 'String', 'APPODEAL_API_KEY', '"' + (localProperties['appodeal.api.key'] ?: '') + '"'
@@ -122,6 +122,9 @@ android {
 
 kapt {
     correctErrorTypes = true
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
@@ -215,6 +218,7 @@ dependencies {
     testImplementation 'org.mockito.kotlin:mockito-kotlin:5.1.0'
     testImplementation 'androidx.arch.core:core-testing:2.2.0'
     testImplementation "androidx.room:room-testing:2.7.0"
+    androidTestImplementation "androidx.room:room-testing:2.7.0"
     androidTestImplementation 'androidx.test:core:1.5.0'
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

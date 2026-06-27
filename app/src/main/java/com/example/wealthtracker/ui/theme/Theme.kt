@@ -18,17 +18,20 @@ import androidx.core.view.WindowCompat
 import com.example.wealthtracker.util.findActivity
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF66BB6A),
+    primary = Color(0xFF6B9EFF),
     secondary = Color(0xFF81C784),
     tertiary = Color(0xFFA5D6A7),
-    surface = Color(0xFF121212),
-    onSurface = Color(0xFFE5E5E5),
-    surfaceVariant = Color(0xFF1E1F1E),
-    onSurfaceVariant = Color(0xFFB9C2BA)
+    background = Color(0xFF0F0F0F),
+    surface = Color(0xFF1C1C1E),
+    onBackground = Color(0xFFF5F5F5),
+    onSurface = Color(0xFFF5F5F5),
+    surfaceVariant = Color(0xFF2C2C2E),
+    onSurfaceVariant = Color(0xFFD0D0D0),
+    outlineVariant = Color(0xFF3A3A3C)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF2E7D32),
+    primary = Color(0xFF2563EB),
     secondary = Color(0xFF4CAF50),
     tertiary = Color(0xFF81C784),
     background = Color(0xFFF5F6F5),
@@ -38,14 +41,14 @@ private val LightColorScheme = lightColorScheme(
     onTertiary = Color.White,
     onBackground = Color(0xFF1C1B1F),
     onSurface = Color(0xFF1C1B1F),
-    surfaceVariant = Color(0xFFE7EFE8),
-    onSurfaceVariant = Color(0xFF4D6356)
+    surfaceVariant = Color(0xFFEEF0F4),
+    onSurfaceVariant = Color(0xFF5A6070)
 )
 
 @Composable
 fun WealthTrackerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -61,7 +64,7 @@ fun WealthTrackerTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = activity?.window ?: return@SideEffect
-            window.statusBarColor = colorScheme.primary.toArgb()
+            window.statusBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }

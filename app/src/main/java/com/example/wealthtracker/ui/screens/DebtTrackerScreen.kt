@@ -419,17 +419,17 @@ private fun DebtFormSheet(
     var selectedType by remember { mutableStateOf(initial?.debtType ?: DEBT_TYPES[0]) }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     // Raw values (digits only, no grouping separators) — AmountTextField formats display
-    var outstanding by remember { mutableStateOf(if ((initial?.outstandingBalance ?: 0.0) > 0) initial!!.outstandingBalance.toBigDecimal().stripTrailingZeros().toPlainString() else "") }
-    var rate by remember { mutableStateOf(if ((initial?.interestRate ?: 0.0) > 0) String.format(Locale.ENGLISH, "%.1f", initial!!.interestRate) else "") }
+    var outstanding by remember { mutableStateOf(initial?.outstandingBalance?.takeIf { it > 0 }?.toBigDecimal()?.stripTrailingZeros()?.toPlainString() ?: "") }
+    var rate by remember { mutableStateOf(initial?.interestRate?.takeIf { it > 0 }?.let { String.format(Locale.ENGLISH, "%.1f", it) } ?: "") }
     // Loan-specific
-    var principal by remember { mutableStateOf(if ((initial?.principalAmount ?: 0.0) > 0 && initial?.debtType != "Credit Card") initial!!.principalAmount.toBigDecimal().stripTrailingZeros().toPlainString() else "") }
-    var emi by remember { mutableStateOf(if ((initial?.emiAmount ?: 0.0) > 0 && initial?.debtType != "Credit Card") initial!!.emiAmount.toBigDecimal().stripTrailingZeros().toPlainString() else "") }
+    var principal by remember { mutableStateOf(initial?.takeIf { it.principalAmount > 0 && it.debtType != "Credit Card" }?.principalAmount?.toBigDecimal()?.stripTrailingZeros()?.toPlainString() ?: "") }
+    var emi by remember { mutableStateOf(initial?.takeIf { it.emiAmount > 0 && it.debtType != "Credit Card" }?.emiAmount?.toBigDecimal()?.stripTrailingZeros()?.toPlainString() ?: "") }
     var startDate by remember { mutableStateOf(initial?.startDate ?: "") }
-    var tenure by remember { mutableStateOf(if ((initial?.tenureMonths ?: 0) > 0 && initial?.debtType != "Credit Card") initial!!.tenureMonths.toString() else "") }
+    var tenure by remember { mutableStateOf(initial?.takeIf { (it.tenureMonths ?: 0) > 0 && it.debtType != "Credit Card" }?.tenureMonths?.toString() ?: "") }
     // Credit card-specific
-    var creditLimit by remember { mutableStateOf(if ((initial?.principalAmount ?: 0.0) > 0 && initial?.debtType == "Credit Card") initial!!.principalAmount.toBigDecimal().stripTrailingZeros().toPlainString() else "") }
-    var minDue by remember { mutableStateOf(if ((initial?.emiAmount ?: 0.0) > 0 && initial?.debtType == "Credit Card") initial!!.emiAmount.toBigDecimal().stripTrailingZeros().toPlainString() else "") }
-    var billingDay by remember { mutableStateOf(if ((initial?.tenureMonths ?: 0) in 1..31 && initial?.debtType == "Credit Card") initial!!.tenureMonths.toString() else "") }
+    var creditLimit by remember { mutableStateOf(initial?.takeIf { it.principalAmount > 0 && it.debtType == "Credit Card" }?.principalAmount?.toBigDecimal()?.stripTrailingZeros()?.toPlainString() ?: "") }
+    var minDue by remember { mutableStateOf(initial?.takeIf { it.emiAmount > 0 && it.debtType == "Credit Card" }?.emiAmount?.toBigDecimal()?.stripTrailingZeros()?.toPlainString() ?: "") }
+    var billingDay by remember { mutableStateOf(initial?.takeIf { (it.tenureMonths ?: 0) in 1..31 && it.debtType == "Credit Card" }?.tenureMonths?.toString() ?: "") }
 
     var typeExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }

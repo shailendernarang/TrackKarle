@@ -13,6 +13,7 @@ import com.example.wealthtracker.data.local.WealthTrackerDatabase
 import com.example.wealthtracker.data.local.MIGRATION_1_2
 import com.example.wealthtracker.data.local.MIGRATION_2_3
 import com.example.wealthtracker.data.local.MIGRATION_3_4
+import com.example.wealthtracker.data.local.MIGRATION_4_5
 import com.example.wealthtracker.data.repository.DefaultInvestmentRepository
 import com.example.wealthtracker.data.repository.InvestmentRepository
 import dagger.Binds
@@ -70,7 +71,7 @@ object AppModule {
             context,
             WealthTrackerDatabase::class.java,
             if (factory != null) "wealth_tracker_encrypted.db" else "wealth_tracker.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
         if (factory != null) builder.openHelperFactory(factory)
         val db = builder.build()
 
@@ -128,7 +129,7 @@ object AppModule {
                         // STEP 2: Safe migration with multiple protections
                         safetyGuard.safeOperation("migration_plain_to_encrypted", createBackup = false) {
                             val oldDb = Room.databaseBuilder(context, WealthTrackerDatabase::class.java, "wealth_tracker.db")
-                                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                                 .build()
                             var copied = false
                             try {
@@ -202,7 +203,7 @@ object AppModule {
                 if (plainPath.exists()) {
                     // Open both DBs: encrypted (db) and plain
                     val plainDb = Room.databaseBuilder(context, WealthTrackerDatabase::class.java, "wealth_tracker.db")
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                         .build()
                     try {
                         val encDao = db.investmentDao()
@@ -265,7 +266,7 @@ object AppModule {
                     }
                     val encDb = Room.databaseBuilder(context, WealthTrackerDatabase::class.java, "wealth_tracker_encrypted.db")
                         .openHelperFactory(encFactory)
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                         .build()
                     try {
                         val plainDao = db.investmentDao()

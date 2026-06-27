@@ -122,6 +122,27 @@ class InvestmentViewModel @Inject constructor(
         }
     }
 
+    private val _pendingInvestment = MutableStateFlow<InvestmentEntity?>(null)
+    val pendingInvestment: StateFlow<InvestmentEntity?> = _pendingInvestment
+
+    private val _lastSaved = MutableStateFlow<InvestmentEntity?>(null)
+    val lastSaved: StateFlow<InvestmentEntity?> = _lastSaved
+
+    fun setPendingInvestment(entity: InvestmentEntity) {
+        _pendingInvestment.value = entity
+    }
+
+    fun confirmSavePending() {
+        val entity = _pendingInvestment.value ?: return
+        _lastSaved.value = entity
+        addInvestmentFull(entity)
+        _pendingInvestment.value = null
+    }
+
+    fun clearPending() {
+        _pendingInvestment.value = null
+    }
+
     fun updateInvestment(updatedEntity: InvestmentEntity) {
         viewModelScope.launch {
             repo.updateInvestment(updatedEntity)

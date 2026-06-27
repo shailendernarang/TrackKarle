@@ -570,11 +570,6 @@ fun StockAnalysisScreen(onBack: () -> Unit = {}) {
                 // Market news
                 CompactNewsSection("Market News", marketNews)
 
-                // Ad
-                LocalActivity.current?.let { act ->
-                    AppodealBanner(activity = act, modifier = Modifier.fillMaxWidth().height(50.dp))
-                }
-
                 CompactNewsSection("Top 10 Stocks", top10News)
                 CompactNewsSection("Top 10 Penny Stocks", pennyNews)
 
@@ -732,7 +727,7 @@ private fun FallbackHeader(symbol: String, name: String?, pts: List<Pair<Long, D
                  style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Box(
                 modifier = Modifier.clip(RoundedCornerShape(6.dp))
-                    .background(if (up) Color(0xFFDCFCE7) else Color(0xFFFEE2E2))
+                    .background(if (up) Color(0xFF16A34A).copy(alpha = 0.15f) else Color(0xFFDC2626).copy(alpha = 0.15f))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
@@ -1125,7 +1120,7 @@ private fun FullscreenChartDialog(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isPos) Color(0xFFDCFCE7) else Color(0xFFFEE2E2))
+                                .background(if (isPos) Color(0xFF16A34A).copy(alpha = 0.15f) else Color(0xFFDC2626).copy(alpha = 0.15f))
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {

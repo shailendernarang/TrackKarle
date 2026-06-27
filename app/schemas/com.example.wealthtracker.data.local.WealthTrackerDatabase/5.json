@@ -1,0 +1,207 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "a5346a1d5d9723e13bcce18a442801ee",
+    "entities": [
+      {
+        "tableName": "investments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `amount` REAL NOT NULL, `createdAt` INTEGER NOT NULL, `investmentType` TEXT NOT NULL, `bankName` TEXT, `fdStartDate` TEXT, `fdMaturityDate` TEXT, `fdRate` REAL, `fdTenure` TEXT, `mfDate` TEXT, `ppfFy` TEXT, `ppfDate` TEXT, `npsTier` TEXT, `npsDate` TEXT, `goldType` TEXT, `goldDate` TEXT, `hiPolicyName` TEXT, `hiRenewalDate` TEXT, `stockName` TEXT, `stockDate` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amount",
+            "columnName": "amount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "investmentType",
+            "columnName": "investmentType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankName",
+            "columnName": "bankName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fdStartDate",
+            "columnName": "fdStartDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fdMaturityDate",
+            "columnName": "fdMaturityDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fdRate",
+            "columnName": "fdRate",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "fdTenure",
+            "columnName": "fdTenure",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mfDate",
+            "columnName": "mfDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ppfFy",
+            "columnName": "ppfFy",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ppfDate",
+            "columnName": "ppfDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "npsTier",
+            "columnName": "npsTier",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "npsDate",
+            "columnName": "npsDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "goldType",
+            "columnName": "goldType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "goldDate",
+            "columnName": "goldDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "hiPolicyName",
+            "columnName": "hiPolicyName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "hiRenewalDate",
+            "columnName": "hiRenewalDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "stockName",
+            "columnName": "stockName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "stockDate",
+            "columnName": "stockDate",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "debts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `debtType` TEXT NOT NULL, `principalAmount` REAL NOT NULL, `outstandingBalance` REAL NOT NULL, `interestRate` REAL NOT NULL, `emiAmount` REAL NOT NULL, `startDate` TEXT NOT NULL, `tenureMonths` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "debtType",
+            "columnName": "debtType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "principalAmount",
+            "columnName": "principalAmount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outstandingBalance",
+            "columnName": "outstandingBalance",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interestRate",
+            "columnName": "interestRate",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "emiAmount",
+            "columnName": "emiAmount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startDate",
+            "columnName": "startDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tenureMonths",
+            "columnName": "tenureMonths",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a5346a1d5d9723e13bcce18a442801ee')"
+    ]
+  }
+}

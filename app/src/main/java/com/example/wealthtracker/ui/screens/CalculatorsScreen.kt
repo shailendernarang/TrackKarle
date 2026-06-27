@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ss.wealthtracker.R
 import com.example.wealthtracker.ui.components.AppodealBanner
+import com.example.wealthtracker.ui.components.AppBottomNavBar
 import kotlin.math.pow
 
 // ------------------------ DATA + HELPERS ------------------------
@@ -74,7 +75,15 @@ private val TENURE_ORDER = listOf("1y", "1y 4m", "1y 6m", "2y", "3y", "5y")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showBack: Boolean = true) {
+fun CalculatorsScreen(
+    onBack: () -> Unit = {},
+    initialTab: String? = null,
+    showBack: Boolean = true,
+    onGoHome: () -> Unit = {},
+    onGoPortfolio: () -> Unit = {},
+    onGoSettings: () -> Unit = {},
+    onAddClick: () -> Unit = {}
+) {
     val tabs = listOf("FD", "SIP", "Lump- Sum", "PPF/EPF")
     val initialIndex = when (initialTab?.lowercase()) {
         "fd" -> 0
@@ -100,14 +109,14 @@ fun CalculatorsScreen(onBack: () -> Unit = {}, initialTab: String? = null, showB
             )
         },
         bottomBar = {
-            val activity = com.example.wealthtracker.util.LocalActivity.current
-            if (activity != null) {
-                androidx.compose.material3.Surface(
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
-                ) {
-                    AppodealBanner(activity = activity, modifier = Modifier.fillMaxWidth().height(50.dp))
-                }
-            }
+            AppBottomNavBar(
+                currentRoute = "calculators",
+                onGoHome = onGoHome,
+                onGoPortfolio = onGoPortfolio,
+                onGoCalculators = {},
+                onGoSettings = onGoSettings,
+                onAddClick = onAddClick
+            )
         }
     ) { inner ->
         Column(

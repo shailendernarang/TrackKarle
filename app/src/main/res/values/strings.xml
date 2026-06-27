@@ -31,7 +31,7 @@
     <string name="empty_no_investments">No investments yet</string>
     <string name="btn_add_investment">Add Investment</string>
     <string name="btn_delete_all">Delete All</string>
-    <string name="label_amount">Amount (₹)</string>
+    <string name="label_amount">Amount</string>
     <string name="hint_investment_name">e.g., US Stocks, Crypto, Bonds</string>
     <string name="label_investment_type">Investment Type</string>
     <string name="label_bank">Bank</string>

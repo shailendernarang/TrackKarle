@@ -161,8 +161,12 @@ import com.example.wealthtracker.util.AverageRatesProvider
 import java.net.URL
 import kotlinx.coroutines.withContext
 import android.util.Log
+import com.example.wealthtracker.ui.components.AppBottomNavBar
 import com.example.wealthtracker.ui.components.AppodealBanner
 import com.ss.wealthtracker.BuildConfig
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.rememberDatePickerState
@@ -382,6 +386,7 @@ private fun TotalsBar(items: List<InvestmentEntity>) {
 fun InvestmentScreen(
     viewModel: InvestmentViewModel = hiltViewModel(),
     onOpenDashboard: () -> Unit = {},
+    onOpenPortfolio: () -> Unit = {},
     onOpenCalculators: () -> Unit = {},
     onOpenStocks: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -391,19 +396,35 @@ fun InvestmentScreen(
     requireDeviceLock: Boolean = false,
     onToggleRequireDeviceLock: () -> Unit = {},
     useHindiNumerals: Boolean = false,
-    onToggleHindiNumerals: () -> Unit = {}
+    onToggleHindiNumerals: () -> Unit = {},
+    preSelectedType: String? = null,
+    preOthersName: String? = null,
+    onReviewInvestment: () -> Unit = {},
+    onAddClick: () -> Unit = {}
 ) {
     val items by viewModel.filteredInvestments.collectAsState()
     val allItems by viewModel.investments.collectAsState()
     val typeFilter by viewModel.typeFilter.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
+    // Used to restore form state when returning from ReviewInvestmentScreen via Edit Details
+    val pendingForEdit = if (preSelectedType != null) viewModel.pendingInvestment.value else null
     var editing by remember { mutableStateOf<InvestmentEntity?>(null) }
     var showEditBottomSheet by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
-    var amount by remember { mutableStateOf(TextFieldValue("")) }
-    var invType by remember { mutableStateOf(if (InvestmentTypes.all.contains("FD")) "FD" else InvestmentTypes.all.first()) }
-    var othersName by remember { mutableStateOf("") }
+    var amount by remember {
+        val prefilled = pendingForEdit?.amount?.let {
+            val plain = it.toBigDecimal().stripTrailingZeros().toPlainString()
+            FormatUtils.formatAmountInput(plain)
+        } ?: ""
+        mutableStateOf(TextFieldValue(prefilled))
+    }
+    var invType by remember {
+        mutableStateOf(
+            preSelectedType?.takeIf { InvestmentTypes.all.contains(it) }
+                ?: if (InvestmentTypes.all.contains("FD")) "FD" else InvestmentTypes.all.first()
+        )
+    }
+    var othersName by remember { mutableStateOf(preOthersName ?: "") }
     var mfName by remember { mutableStateOf("") }
     var mfSuggest by remember { mutableStateOf(listOf<String>()) }
     var mfExpanded by remember { mutableStateOf(false) }
@@ -411,7 +432,7 @@ fun InvestmentScreen(
     var mfCommittedName by remember { mutableStateOf<String?>(null) }
     var mfHasFocus by remember { mutableStateOf(false) }
     var bankExpanded by remember { mutableStateOf(false) }
-    var selectedBank: String? by remember { mutableStateOf(null) }
+    var selectedBank: String? by remember { mutableStateOf(pendingForEdit?.bankName) }
     var customBankName by remember { mutableStateOf("") }
     // FD extra fields
     var fdStartDate by remember { mutableStateOf("") }
@@ -656,7 +677,8 @@ fun InvestmentScreen(
     val isCompact = cfg.screenWidthDp < 600
 
     Scaffold(
-        snackbarHost = { 
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = {
             Box(modifier = Modifier.imePadding()) {
                 ModernSnackbarHost(
                     hostState = snackbar,
@@ -665,27 +687,19 @@ fun InvestmentScreen(
             }
         },
         bottomBar = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (items.isNotEmpty()) {
-                    TotalsBar(items)
-                }
-                androidx.compose.material3.Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        // Appodeal banner ad — no padding so it fills edge-to-edge
-                        val activity = com.example.wealthtracker.util.LocalActivity.current
-                        if (activity != null) AppodealBanner(
-                            activity = activity,
-                            modifier = Modifier.fillMaxWidth().height(50.dp)
-                        )
-                        Text(
-                            "Private • No cloud sync • Offline",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .padding(vertical = 6.dp)
-                        )
+            if (preSelectedType == null) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (items.isNotEmpty()) {
+                        TotalsBar(items)
                     }
+                    AppBottomNavBar(
+                        currentRoute = "invest",
+                        onGoHome = onOpenDashboard,
+                        onGoPortfolio = onOpenPortfolio,
+                        onGoCalculators = onOpenCalculators,
+                        onGoSettings = onOpenSettings,
+                        onAddClick = onAddClick
+                    )
                 }
             }
         },
@@ -697,106 +711,51 @@ fun InvestmentScreen(
                     }
                 },
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        val comp by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_transfer))
-                        val iconSize = if (isCompact) 40.dp else 56.dp
-                        Box(modifier = Modifier.height(iconSize).width(iconSize)) {
-                            if (comp != null) {
-                                LottieAnimation(
-                                    composition = comp,
-                                    iterations = Int.MAX_VALUE,
-                                    isPlaying = true,
-                                    speed = 1.2f
-                                )
-                            }
+                    if (preSelectedType != null) {
+                        val typeLabel = when {
+                            othersName.isNotBlank() -> othersName
+                            invType == "FD" -> "Fixed Deposit"
+                            invType == "Equity" -> "Stocks"
+                            else -> invType
                         }
                         Column {
-                            Text(stringResource(R.string.title_investments), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(stringResource(R.string.subtitle_investments), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "Add Investment",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                typeLabel,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-                    }
-                },
-                actions = {
-                    val ctx = LocalContext.current
-                    var exportMenu by remember { mutableStateOf(false) }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = stringResource(id = R.string.settings))
-                    }
-                    IconButton(onClick = { exportMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Export")
-                    }
-                    DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Share CSV") },
-                            onClick = {
-                                exportMenu = false
-                                val f = createCsvFile(ctx, items)
-                                val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", f)
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/csv"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val comp by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.money_transfer))
+                            val iconSize = if (isCompact) 40.dp else 56.dp
+                            Box(modifier = Modifier.height(iconSize).width(iconSize)) {
+                                if (comp != null) {
+                                    LottieAnimation(
+                                        composition = comp,
+                                        iterations = Int.MAX_VALUE,
+                                        isPlaying = true,
+                                        speed = 1.2f
+                                    )
                                 }
-                                val chooser = Intent.createChooser(intent, "Share CSV").apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                ctx.startActivity(chooser)
                             }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Share PDF") },
-                            onClick = {
-                                exportMenu = false
-                                val f = createPdfFile(ctx, items)
-                                val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", f)
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/pdf"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                val chooser = Intent.createChooser(intent, "Share PDF").apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                ctx.startActivity(chooser)
+                            Column {
+                                Text(stringResource(R.string.title_investments), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(R.string.subtitle_investments), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        floatingActionButton = {
-            // Speed dial: quick access actions
-            Column(horizontalAlignment = Alignment.End) {
-                AnimatedVisibility(visible = expanded) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
-                        ExtendedFloatingActionButton(
-                            onClick = { onOpenDashboard(); expanded = false },
-                            icon = { Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null) },
-                            text = { Text(stringResource(id = R.string.title_dashboard)) }
-                        )
-                        ExtendedFloatingActionButton(
-                            onClick = { onOpenCalculators(); expanded = false },
-                            icon = { Icon(Icons.Default.Calculate, contentDescription = null) },
-                            text = { Text("Calculators") }
-                        )
-                        ExtendedFloatingActionButton(
-                            onClick = { onOpenStocks(); expanded = false },
-                            icon = { Icon(Icons.Default.Savings, contentDescription = null) },
-                            text = { Text("Stock Analysis") }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                FloatingActionButton(
-                    onClick = { expanded = !expanded },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More")
-                }
-            }
-        }
     ) { inner ->
         // Snackbar bridge
         LaunchedEffect(message) {
@@ -831,46 +790,52 @@ fun InvestmentScreen(
             // Visualization moved below the Add section as requested
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = if (preSelectedType != null) 0.dp else 0.dp)
             ) {
-                Column(modifier = Modifier.padding(6.dp)) {
+                Column(modifier = Modifier.padding(if (preSelectedType != null) 16.dp else 6.dp)) {
+                    if (preSelectedType != null) {
+                        Text(
+                            text = "INVESTMENT DETAILS",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(14.dp))
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedTextField(
                             value = amount,
                             onValueChange = { tf -> amount = formatIndianNumberTF(tf) },
-                            label = { 
+                            label = {
                                 Text(
                                     stringResource(R.string.label_amount),
                                     style = MaterialTheme.typography.bodyMedium
-                                ) 
+                                )
                             },
                             placeholder = {
-                                val symbol = FormatUtils.getCurrencySymbol()
-                                val ph = when (invType) {
-                                    "FD" -> "$symbol 1,00,000"
-                                    "Mutual Fund" -> "$symbol 50,000"
-                                    "Stocks", "Equity" -> "$symbol 25,000"
-                                    "Gold" -> "$symbol 10,000"
-                                    "PPF", "EPF", "NPS" -> "$symbol 1,50,000"
-                                    "Health Insurance", "Term Insurance" -> "$symbol 15,000"
-                                    else -> "$symbol 10,000"
-                                }
                                 Text(
-                                    ph,
+                                    "Enter amount",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
                             },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.AccountBalance,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
+                            prefix = {
+                                Text(
+                                    FormatUtils.getCurrencySymbol(),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             singleLine = true,
                             isError = amountError,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(12.dp),
                             textStyle = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Medium,
                                 letterSpacing = 0.5.sp
@@ -883,7 +848,7 @@ fun InvestmentScreen(
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 64.dp, max = 72.dp) // Increased height for better comma visibility
+                                .heightIn(min = 64.dp, max = 72.dp)
                         )
                     }
                     if (amountError) {
@@ -895,39 +860,41 @@ fun InvestmentScreen(
                             .fillMaxWidth()
                             .animateContentSize() // Smooth animation for FD-specific fields
                     ) {
-                        Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            InvestmentTypes.all.forEach { t ->
-                                val selectedAdd = invType == t
-                                FilterChip(
-                                    selected = selectedAdd,
-                                    onClick = { invType = t; if (t != "FD") selectedBank = null },
-                                    label = { Text(if (t == "FD") stringResource(R.string.fixed_deposit) else if (t == "Equity") "Stocks" else t) },
-                                    leadingIcon = {
-                                        val icon = when (t) {
-                                            "FD" -> Icons.Default.AccountBalance
-                                            "Mutual Fund", "NPS", "Equity" -> Icons.AutoMirrored.Filled.TrendingUp
-                                            "Gold" -> Icons.Default.Savings
-                                            "PPF", "EPF" -> Icons.Default.AccountBalance
-                                            "Term Insurance", "Health Insurance" -> Icons.Default.Savings
-                                            else -> Icons.Default.Savings
-                                        }
-                                        Icon(icon, contentDescription = null)
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        if (preSelectedType == null) {
+                            Text(stringResource(R.string.label_investment_type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                InvestmentTypes.all.forEach { t ->
+                                    val selectedAdd = invType == t
+                                    FilterChip(
+                                        selected = selectedAdd,
+                                        onClick = { invType = t; if (t != "FD") selectedBank = null },
+                                        label = { Text(if (t == "FD") stringResource(R.string.fixed_deposit) else if (t == "Equity") "Stocks" else t) },
+                                        leadingIcon = {
+                                            val icon = when (t) {
+                                                "FD" -> Icons.Default.AccountBalance
+                                                "Mutual Fund", "NPS", "Equity" -> Icons.AutoMirrored.Filled.TrendingUp
+                                                "Gold" -> Icons.Default.Savings
+                                                "PPF", "EPF" -> Icons.Default.AccountBalance
+                                                "Term Insurance", "Health Insurance" -> Icons.Default.Savings
+                                                else -> Icons.Default.Savings
+                                            }
+                                            Icon(icon, contentDescription = null)
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
-                        if (invType == "Others") {
+                        if (invType == "Others" && preOthersName == null) {
                             OutlinedTextField(
                                 value = othersName,
                                 onValueChange = { othersName = it },
@@ -1218,8 +1185,12 @@ fun InvestmentScreen(
                                     DropdownMenuItem(text = { Text(t) }, onClick = { npsTier = t; tierMenu = false })
                                 }
                             }
-                            if (!npsTier.isNullOrBlank()) {
-                                val info = if (npsTier!!.startsWith("Tier I")) "Long-term retirement account with withdrawal restrictions." else if (npsTier!!.startsWith("Tier II")) "Flexible savings account with free withdrawals." else "Other plan type."
+                            npsTier?.takeIf { it.isNotBlank() }?.let { tier ->
+                                val info = when {
+                                    tier.startsWith("Tier I")  -> "Long-term retirement account with withdrawal restrictions."
+                                    tier.startsWith("Tier II") -> "Flexible savings account with free withdrawals."
+                                    else                       -> "Other plan type."
+                                }
                                 Text(info, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Spacer(Modifier.height(8.dp))
@@ -1351,70 +1322,69 @@ fun InvestmentScreen(
                         Text(stringResource(R.string.error_select_bank_fd), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        Button(onClick = {
-                            attemptedAdd = true
-                            focusManager.clearFocus()
-                            keyboard?.hide()
-                            val amountValue = amount.text.replace(",", "").toDoubleOrNull()
-                            val canAdd = amountValue != null && amountValue > 0.0 &&
-                                !(invType == "FD" && selectedBank == null) &&
-                                !(invType == "Others" && othersName.isBlank())
-                            if (canAdd) {
-                                val displayType = when (invType) {
-                                    "Others" -> othersName
-                                    "Mutual Fund" -> mfName.ifBlank { "Mutual Fund" }
-                                    "Equity" -> stockName.ifBlank { "Stocks" }
-                                    else -> invType
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Brush.linearGradient(listOf(Color(0xFF2563EB), Color(0xFF7C3AED))))
+                            .clickable {
+                                attemptedAdd = true
+                                focusManager.clearFocus()
+                                keyboard?.hide()
+                                val amountValue = amount.text.replace(",", "").toDoubleOrNull()
+                                val canAdd = amountValue != null && amountValue > 0.0 &&
+                                    !(invType == "FD" && selectedBank == null) &&
+                                    !(invType == "Others" && othersName.isBlank())
+                                if (canAdd) {
+                                    val displayType = when (invType) {
+                                        "Others" -> othersName
+                                        "Mutual Fund" -> mfName.ifBlank { "Mutual Fund" }
+                                        "Equity" -> stockName.ifBlank { "Stocks" }
+                                        else -> invType
+                                    }
+                                    val finalBankName = if (selectedBank == "Others" && customBankName.isNotBlank()) {
+                                        customBankName
+                                    } else {
+                                        selectedBank
+                                    }
+                                    val entity = com.example.wealthtracker.data.local.InvestmentEntity(
+                                        type = displayType,
+                                        amount = amountValue!!,
+                                        investmentType = if (invType == "Equity" || invType == "Stocks") "Equity" else invType,
+                                        bankName = if (invType == "FD") finalBankName else null,
+                                        fdStartDate = if (invType == "FD") fdStartDate.takeIf { it.isNotBlank() } else null,
+                                        fdMaturityDate = if (invType == "FD") fdMaturityDate.takeIf { it.isNotBlank() } else null,
+                                        fdRate = if (invType == "FD") fdRate.toDoubleOrNull() else null,
+                                        fdTenure = null,
+                                        mfDate = if (invType == "Mutual Fund") mfDate.takeIf { it.isNotBlank() } else null,
+                                        ppfFy = if (invType == "PPF") ppfFy else null,
+                                        ppfDate = if (invType == "PPF") ppfDate.takeIf { it.isNotBlank() } else null,
+                                        npsTier = if (invType == "NPS") npsTier else null,
+                                        npsDate = if (invType == "NPS") npsDate.takeIf { it.isNotBlank() } else null,
+                                        goldType = if (invType == "Gold") goldType else null,
+                                        goldDate = if (invType == "Gold") goldDate.takeIf { it.isNotBlank() } else null,
+                                        hiPolicyName = if (invType == "Health Insurance") hiPolicyName.takeIf { it.isNotBlank() } else null,
+                                        hiRenewalDate = if (invType == "Health Insurance") hiRenewalDate.takeIf { it.isNotBlank() } else null,
+                                        stockName = if (invType == "Equity" || invType == "Stocks") stockName.takeIf { it.isNotBlank() } else null,
+                                        stockDate = if (invType == "Equity" || invType == "Stocks") stockDate.takeIf { it.isNotBlank() } else null
+                                    )
+                                    viewModel.setPendingInvestment(entity)
+                                    onReviewInvestment()
                                 }
-                                // Determine final bank name (use custom if Others selected)
-                                val finalBankName = if (selectedBank == "Others" && customBankName.isNotBlank()) {
-                                    customBankName
-                                } else {
-                                    selectedBank
-                                }
-                                val entity = com.example.wealthtracker.data.local.InvestmentEntity(
-                                    type = displayType,
-                                    amount = amountValue!!,
-                                    investmentType = if (invType == "Equity" || invType == "Stocks") "Stocks" else invType,
-                                    bankName = if (invType == "FD") finalBankName else null,
-                                    fdStartDate = if (invType == "FD") fdStartDate.takeIf { it.isNotBlank() } else null,
-                                    fdMaturityDate = if (invType == "FD") fdMaturityDate.takeIf { it.isNotBlank() } else null,
-                                    fdRate = if (invType == "FD") fdRate.toDoubleOrNull() else null,
-                                    fdTenure = null,
-                                    mfDate = if (invType == "Mutual Fund") mfDate.takeIf { it.isNotBlank() } else null,
-                                    ppfFy = if (invType == "PPF") ppfFy else null,
-                                    ppfDate = if (invType == "PPF") ppfDate.takeIf { it.isNotBlank() } else null,
-                                    npsTier = if (invType == "NPS") npsTier else null,
-                                    npsDate = if (invType == "NPS") npsDate.takeIf { it.isNotBlank() } else null,
-                                    goldType = if (invType == "Gold") goldType else null,
-                                    goldDate = if (invType == "Gold") goldDate.takeIf { it.isNotBlank() } else null,
-                                    hiPolicyName = if (invType == "Health Insurance") hiPolicyName.takeIf { it.isNotBlank() } else null,
-                                    hiRenewalDate = if (invType == "Health Insurance") hiRenewalDate.takeIf { it.isNotBlank() } else null,
-                                    stockName = if (invType == "Equity" || invType == "Stocks") stockName.takeIf { it.isNotBlank() } else null,
-                                    stockDate = if (invType == "Equity" || invType == "Stocks") stockDate.takeIf { it.isNotBlank() } else null
-                                )
-                                viewModel.addInvestmentFull(entity)
-                                // Clear inputs
-                                amount = TextFieldValue("")
-                                selectedBank = null
-                                customBankName = ""
-                                fdStartDate = ""; fdMaturityDate = ""; fdRate = ""
-                                mfName = ""; mfDate = ""
-                                ppfFy = null; ppfDate = ""
-                                npsTier = null; npsDate = ""
-                                goldType = null; goldDate = ""
-                                hiPolicyName = ""; hiRenewalDate = ""
-                                stockName = ""; stockDate = ""; stockSuggest = emptyList(); stockExpanded = false
-                                attemptedAdd = false
-                                pendingAddHighlight = true
-                                showCelebration = true
-                                viewModel.setTypeFilter(invType)
-                            }
-                        }) { Text(stringResource(id = R.string.btn_add_investment), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)) }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Review Investment",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
+            if (preSelectedType == null) {
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier
@@ -1576,6 +1546,7 @@ fun InvestmentScreen(
             }
 
             // Removed legacy export/import dialogs; sharing now generates files directly
+            } // end if (preSelectedType == null)
         }
             // Celebration overlay (does not affect layout)
             if (showCelebration) {
@@ -1608,20 +1579,6 @@ fun InvestmentScreen(
             }
             
             
-            // Scrim for FAB menu - inside content so FAB renders on top
-            if (expanded) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f))
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() }
-                        ) {
-                            expanded = false
-                        }
-                )
-            }
         }
     }
     

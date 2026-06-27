@@ -52,6 +52,7 @@ import coil.ImageLoader
 import coil.decode.SvgDecoder
 import com.example.wealthtracker.ui.components.AnimatedPriceText
 import com.example.wealthtracker.ui.components.AppodealBanner
+import com.example.wealthtracker.ui.components.AppBottomNavBar
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.wealthtracker.data.local.InvestmentEntity
@@ -94,7 +95,8 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit = {},
     onOpenReminders: () -> Unit = {},
     onOpenDebt: () -> Unit = {},
-    onAddDebt: () -> Unit = onOpenDebt
+    onAddDebt: () -> Unit = onOpenDebt,
+    onOpenStocks: () -> Unit = {}
 ) {
     val allItems by viewModel.investments.collectAsState()
     val filtered by viewModel.filteredInvestments.collectAsState()
@@ -104,6 +106,7 @@ fun DashboardScreen(
 
     val ctx = LocalContext.current
     val reminderManager = remember { com.example.wealthtracker.data.ReminderManager.getInstance(ctx) }
+    val activeRemindersTop by reminderManager.activeReminders.collectAsState()
 
     LaunchedEffect(allItems) {
         reminderManager.syncRemindersFromInvestments(allItems)
@@ -239,6 +242,11 @@ fun DashboardScreen(
 
     // ── Derived stats ──────────────────────────────────────────────
     val totalInvested = allItems.sumOf { it.amount }
+    val totalCurrent  = allItems.sumOf { e ->
+        if (e.investmentType == "FD" && e.fdRate != null && e.fdRate > 0)
+            e.amount * (1 + e.fdRate / 100)
+        else e.amount
+    }
     val stocksTotal = allItems.filter { it.investmentType in listOf("Equity", "Stocks") }.sumOf { it.amount }
     val mfTotal = allItems.filter { it.investmentType == "Mutual Fund" }.sumOf { it.amount }
     val fdDailyAccrual = allItems.filter { it.investmentType == "FD" }
@@ -287,7 +295,15 @@ fun DashboardScreen(
                     },
                     actions = {
                         IconButton(onClick = onOpenReminders) {
-                            Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+                            BadgedBox(
+                                badge = {
+                                    if (activeRemindersTop.isNotEmpty()) {
+                                        Badge(containerColor = Color(0xFFDC2626))
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+                            }
                         }
                         IconButton(onClick = onOpenSettings) {
                             Icon(Icons.Default.Settings, contentDescription = "Settings")
@@ -296,12 +312,15 @@ fun DashboardScreen(
                 )
             },
             bottomBar = {
-                val act = com.example.wealthtracker.util.LocalActivity.current
-                if (act != null) {
-                    androidx.compose.material3.Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-                        AppodealBanner(activity = act, modifier = Modifier.fillMaxWidth().height(50.dp))
-                    }
-                }
+                AppBottomNavBar(
+                    currentRoute = "dashboard",
+                    onGoHome = {},
+                    onGoPortfolio = onOpenInvestments,
+                    onGoCalculators = onOpenCalculators,
+                    onGoSettings = onOpenSettings,
+                    onAddClick = onAddClick,
+                    onGoStocks = onOpenStocks
+                )
             }
         ) { inner ->
             Column(
@@ -315,7 +334,7 @@ fun DashboardScreen(
             ) {
                 // ① Portfolio card with health score
                 PortfolioHeroCard(
-                    total = totalInvested,
+                    total = totalCurrent,
                     totalDebt = totalDebt,
                     assetCount = allItems.size,
                     isAmountHidden = isAmountHidden,

@@ -37,11 +37,15 @@ import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.wealthtracker.ui.screens.InvestmentScreen
 import com.example.wealthtracker.ui.screens.DashboardScreen
+import com.example.wealthtracker.ui.screens.AddInvestmentScreen
 import com.example.wealthtracker.ui.screens.OnboardingScreen
 import com.example.wealthtracker.ui.screens.OnboardingPrefs
 import com.example.wealthtracker.ui.screens.ReferralScreen
 import com.example.wealthtracker.ui.screens.CountrySelectionScreen
 import com.example.wealthtracker.ui.screens.ModernSplashScreen
+import com.example.wealthtracker.ui.screens.ReviewInvestmentScreen
+import com.example.wealthtracker.ui.screens.InvestmentSuccessScreen
+import com.example.wealthtracker.ui.screens.PortfolioScreen
 import com.example.wealthtracker.data.UserPreferences
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -144,47 +148,32 @@ class MainActivity : AppCompatActivity() {
             Appodeal.BANNER or Appodeal.NATIVE,
             object : ApdInitializationCallback {
                 override fun onInitializationFinished(errors: List<ApdInitializationError>?) {
-                    val initResult = if (errors.isNullOrEmpty()) "successfully" else "with ${errors.size} errors"
-                    Log.d("Appodeal", "✅ SDK Initialized $initResult")
-                    errors?.forEach { error ->
-                        Log.e("Appodeal", "❌ Init error: $error")
+                    if (BuildConfig.DEBUG) {
+                        val initResult = if (errors.isNullOrEmpty()) "successfully" else "with ${errors.size} errors"
+                        Log.d("Appodeal", "SDK Initialized $initResult")
+                        errors?.forEach { error -> Log.e("Appodeal", "Init error: $error") }
+                        Log.d("Appodeal", "Auto-cache BANNER: ${Appodeal.isAutoCacheEnabled(Appodeal.BANNER)}")
+                        Log.d("Appodeal", "Auto-cache NATIVE: ${Appodeal.isAutoCacheEnabled(Appodeal.NATIVE)}")
                     }
-                    Log.d("Appodeal", "📊 Auto-cache BANNER: ${Appodeal.isAutoCacheEnabled(Appodeal.BANNER)}")
-                    Log.d("Appodeal", "📊 Auto-cache NATIVE: ${Appodeal.isAutoCacheEnabled(Appodeal.NATIVE)}")
                     // Explicitly cache native ads — auto-cache doesn't always trigger for native
                     Appodeal.cache(this@MainActivity, Appodeal.NATIVE)
-                    Log.d("Appodeal", "🔄 Native cache requested")
                 }
             }
         )
         
-        // Set banner callbacks for debugging
         Appodeal.setBannerCallbacks(object : com.appodeal.ads.BannerCallbacks {
             override fun onBannerLoaded(height: Int, isPrecache: Boolean) {
-                Log.d("Appodeal", "✅ Banner LOADED - height: $height, isPrecache: $isPrecache")
-                Log.d("Appodeal", "📊 Banner isLoaded: ${Appodeal.isLoaded(Appodeal.BANNER)}")
+                if (BuildConfig.DEBUG) Log.d("Appodeal", "Banner loaded height=$height precache=$isPrecache")
             }
-            
             override fun onBannerFailedToLoad() {
-                Log.e("Appodeal", "❌ Banner FAILED to load")
-                Log.e("Appodeal", "📊 SDK initialized: ${Appodeal.isInitialized(Appodeal.BANNER)}")
+                if (BuildConfig.DEBUG) Log.e("Appodeal", "Banner failed to load")
             }
-            
-            override fun onBannerShown() {
-                Log.d("Appodeal", "Banner shown")
-            }
-            
+            override fun onBannerShown() {}
             override fun onBannerShowFailed() {
-                Log.e("Appodeal", "Banner failed to show")
+                if (BuildConfig.DEBUG) Log.e("Appodeal", "Banner failed to show")
             }
-            
-            override fun onBannerClicked() {
-                Log.d("Appodeal", "Banner clicked")
-            }
-            
-            override fun onBannerExpired() {
-                Log.d("Appodeal", "Banner expired")
-            }
+            override fun onBannerClicked() {}
+            override fun onBannerExpired() {}
         })
         // Notifications permission (Android 13+)
         requestNotificationPermission()
@@ -354,6 +343,15 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     )
                                 }
+                                // Shared bottom-nav helper: pops to root and avoids duplicate entries
+                                val navTab: (String) -> Unit = { route ->
+                                    nav.navigate(route) {
+                                        popUpTo("dashboard") { inclusive = false; saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+
                                 composable(
                                     "dashboard",
                                     enterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
@@ -365,13 +363,14 @@ class MainActivity : AppCompatActivity() {
                                         DashboardScreen(
                                             viewModel = vm,
                                             debtViewModel = debtVm,
-                                            onAddClick = { nav.navigate("invest") },
-                                            onOpenInvestments = { nav.navigate("invest") },
-                                            onOpenCalculators = { nav.navigate("calculators?tab=fd") },
-                                            onOpenSettings = { nav.navigate("settings") },
+                                            onAddClick = { nav.navigate("add_investment") },
+                                            onOpenInvestments = { navTab("portfolio") },
+                                            onOpenCalculators = { navTab("calculators") },
+                                            onOpenSettings = { navTab("settings") },
                                             onOpenReminders = { nav.navigate("reminders") },
                                             onOpenDebt = { nav.navigate("debt") },
-                                            onAddDebt  = { nav.navigate("debt?autoAdd=true") }
+                                            onAddDebt  = { nav.navigate("debt?autoAdd=true") },
+                                            onOpenStocks = { nav.navigate("stocks") }
                                         )
                                     }
                                 }
@@ -405,21 +404,62 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                 }
+                                // Add Investment discovery flow
                                 composable(
-                                    "invest",
+                                    "add_investment",
                                     enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
                                     exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
                                     popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
                                     popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                                 ) {
+                                    AddInvestmentScreen(
+                                        viewModel = vm,
+                                        onBack = {
+                                            if (!nav.popBackStack()) {
+                                                nav.navigate("dashboard") {
+                                                    popUpTo(0) { inclusive = true }
+                                                    launchSingleTop = true
+                                                }
+                                            }
+                                        },
+                                        onTypeSelected = { investmentType, preOthersName ->
+                                            val preOthersEncoded = preOthersName?.let {
+                                                java.net.URLEncoder.encode(it, "UTF-8")
+                                            } ?: ""
+                                            nav.navigate("invest?preType=$investmentType&preOthers=$preOthersEncoded")
+                                        }
+                                    )
+                                }
+                                composable(
+                                    route = "invest?preType={preType}&preOthers={preOthers}",
+                                    arguments = listOf(
+                                        androidx.navigation.navArgument("preType") {
+                                            defaultValue = ""
+                                            type = androidx.navigation.NavType.StringType
+                                        },
+                                        androidx.navigation.navArgument("preOthers") {
+                                            defaultValue = ""
+                                            type = androidx.navigation.NavType.StringType
+                                        }
+                                    ),
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) { backStack ->
+                                    val preType = backStack.arguments?.getString("preType")?.takeIf { it.isNotEmpty() }
+                                    val preOthers = backStack.arguments?.getString("preOthers")
+                                        ?.takeIf { it.isNotEmpty() }
+                                        ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
                                     val canGoBack = nav.previousBackStackEntry != null
                                     WithLocalizedContext(useHindiNumerals) {
                                         InvestmentScreen(
                                             viewModel = vm,
-                                            onOpenDashboard = { nav.navigate("dashboard") },
-                                            onOpenCalculators = { nav.navigate("calculators") },
+                                            onOpenDashboard = { navTab("dashboard") },
+                                            onOpenPortfolio = { navTab("portfolio") },
+                                            onOpenCalculators = { navTab("calculators") },
                                             onOpenStocks = { nav.navigate("stocks") },
-                                            onOpenSettings = { nav.navigate("settings") },
+                                            onOpenSettings = { navTab("settings") },
                                             onBack = { nav.popBackStack() },
                                             showBack = canGoBack,
                                             onToggleDarkMode = {
@@ -441,9 +481,73 @@ class MainActivity : AppCompatActivity() {
                                                 scope.launch { SettingsStore.setHindiNumerals(applicationContext, useHindiNumerals) }
                                                 val tagNow = if (useHindiNumerals) "hi-IN" else "en-IN"
                                                 pendingLocaleTag = tagNow
-                                            }
+                                            },
+                                            preSelectedType = preType,
+                                            preOthersName = preOthers,
+                                            onReviewInvestment = { nav.navigate("review_investment") },
+                                            onAddClick = { nav.navigate("add_investment") }
                                         )
                                     }
+                                }
+                                // Review investment before saving
+                                composable(
+                                    "review_investment",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
+                                    ReviewInvestmentScreen(
+                                        viewModel = vm,
+                                        onBack = { nav.popBackStack() },
+                                        onConfirm = { nav.navigate("investment_success") }
+                                    )
+                                }
+                                // Success screen after adding investment
+                                composable(
+                                    "investment_success",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
+                                    InvestmentSuccessScreen(
+                                        viewModel = vm,
+                                        onViewPortfolio = {
+                                            // Clear entire stack, land on dashboard (establishes
+                                            // back-stack root), then immediately go to portfolio
+                                            nav.navigate("dashboard") {
+                                                popUpTo(0) { inclusive = true }
+                                                launchSingleTop = true
+                                            }
+                                            nav.navigate("portfolio") {
+                                                popUpTo("dashboard") { inclusive = false }
+                                                launchSingleTop = true
+                                            }
+                                        },
+                                        onAddAnother = {
+                                            nav.navigate("add_investment") {
+                                                popUpTo(0) { inclusive = true }
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    )
+                                }
+                                composable(
+                                    "portfolio",
+                                    enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                ) {
+                                    PortfolioScreen(
+                                        viewModel = vm,
+                                        debtViewModel = debtVm,
+                                        onGoHome = { navTab("dashboard") },
+                                        onGoCalculators = { navTab("calculators") },
+                                        onGoSettings = { navTab("settings") },
+                                        onAddClick = { nav.navigate("add_investment") }
+                                    )
                                 }
                                 composable(
                                     route = "calculators?tab={tab}",
@@ -462,7 +566,11 @@ class MainActivity : AppCompatActivity() {
                                         com.example.wealthtracker.ui.screens.CalculatorsScreen(
                                             onBack = { nav.popBackStack() },
                                             initialTab = tab,
-                                            showBack = canGoBack
+                                            showBack = canGoBack,
+                                            onGoHome = { navTab("dashboard") },
+                                            onGoPortfolio = { navTab("portfolio") },
+                                            onGoSettings = { navTab("settings") },
+                                            onAddClick = { nav.navigate("add_investment") }
                                         )
                                     }
                                 }
@@ -511,7 +619,11 @@ class MainActivity : AppCompatActivity() {
                                             Log.d("Privacy", "Crash reporting ${if (crashReportingEnabled) "enabled" else "disabled"}")
                                         },
                                         onBack = { nav.popBackStack() },
-                                        onOpenReferral = { nav.navigate("referral") }
+                                        onOpenReferral = { nav.navigate("referral") },
+                                        onGoHome = { navTab("dashboard") },
+                                        onGoPortfolio = { navTab("portfolio") },
+                                        onGoCalculators = { navTab("calculators") },
+                                        onAddClick = { nav.navigate("add_investment") }
                                     )
                                 }
                                 composable(
@@ -647,7 +759,7 @@ private fun rememberStartRoute(fromNotification: Boolean, vm: InvestmentViewMode
     var route by remember(fromNotification) { mutableStateOf<String?>(null) }
     LaunchedEffect(fromNotification) {
         // Fast count query - doesn't load all investment data
-        route = if (vm.hasInvestments()) "dashboard" else "invest"
+        route = if (vm.hasInvestments()) "dashboard" else "add_investment"
     }
     return route
 }

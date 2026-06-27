@@ -7,8 +7,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [InvestmentEntity::class, DebtEntity::class],
-    version = 4,
-    exportSchema = false
+    version = 5,
+    exportSchema = true
 )
 abstract class WealthTrackerDatabase : RoomDatabase() {
     abstract fun investmentDao(): InvestmentDao
@@ -45,5 +45,14 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS debts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, debtType TEXT NOT NULL, principalAmount REAL NOT NULL, outstandingBalance REAL NOT NULL, interestRate REAL NOT NULL, emiAmount REAL NOT NULL, startDate TEXT NOT NULL DEFAULT '', tenureMonths INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL)")
+    }
+}
+
+// Normalise investments that were incorrectly saved with investmentType = 'Stocks'.
+// The canonical DB discriminator for stock/equity investments is 'Equity'.
+// The display label "Stocks" lives only in the UI layer.
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("UPDATE investments SET investmentType = 'Equity' WHERE investmentType = 'Stocks'")
     }
 }

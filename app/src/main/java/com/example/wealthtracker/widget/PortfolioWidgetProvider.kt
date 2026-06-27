@@ -13,6 +13,8 @@ import com.ss.wealthtracker.R
 import com.example.wealthtracker.data.local.WealthTrackerDatabase
 import com.example.wealthtracker.data.local.MIGRATION_1_2
 import com.example.wealthtracker.data.local.MIGRATION_2_3
+import com.example.wealthtracker.data.local.MIGRATION_3_4
+import com.example.wealthtracker.data.local.MIGRATION_4_5
 import com.example.wealthtracker.util.FormatUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +67,7 @@ class PortfolioWidgetProvider : AppWidgetProvider() {
                         context,
                         WealthTrackerDatabase::class.java,
                         "wealth_tracker.db"
-                    ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+                    ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
                     
                     val investments = database.investmentDao().getAllOnce()
                     

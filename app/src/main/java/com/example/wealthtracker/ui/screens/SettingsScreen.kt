@@ -24,6 +24,7 @@ import com.ss.wealthtracker.BuildConfig
 import com.example.wealthtracker.util.BiometricUtils
 import com.example.wealthtracker.analytics.AnalyticsManager
 import com.example.wealthtracker.analytics.TrackScreen
+import com.example.wealthtracker.ui.components.AppBottomNavBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +42,11 @@ fun SettingsScreen(
     isPremium: Boolean = false,
     onBack: () -> Unit,
     onOpenReferral: (() -> Unit)? = null,
-    onOpenPremium: (() -> Unit)? = null
+    onOpenPremium: (() -> Unit)? = null,
+    onGoHome: () -> Unit = {},
+    onGoPortfolio: () -> Unit = {},
+    onGoCalculators: () -> Unit = {},
+    onAddClick: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
     val analytics = remember { AnalyticsManager(ctx) }
@@ -114,6 +119,16 @@ fun SettingsScreen(
                 },
                 title = { Text(stringResource(id = R.string.settings)) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        },
+        bottomBar = {
+            AppBottomNavBar(
+                currentRoute = "settings",
+                onGoHome = onGoHome,
+                onGoPortfolio = onGoPortfolio,
+                onGoCalculators = onGoCalculators,
+                onGoSettings = {},
+                onAddClick = onAddClick
             )
         }
     ) { inner ->
