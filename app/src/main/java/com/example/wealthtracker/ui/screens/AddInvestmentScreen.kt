@@ -569,14 +569,14 @@ private fun SectionHeader(
 private fun CategoryChip(category: InvCategory, onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        modifier = Modifier.width(80.dp).height(96.dp),
+        modifier = Modifier.width(90.dp).wrapContentHeight(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            Modifier.padding(13.dp).fillMaxWidth(),
+            Modifier.padding(horizontal = 8.dp, vertical = 10.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -586,7 +586,8 @@ private fun CategoryChip(category: InvCategory, onClick: () -> Unit) {
             }
             Text(category.name, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold, letterSpacing = (-0.16).sp,
-                textAlign = TextAlign.Center, maxLines = 2, softWrap = true)
+                textAlign = TextAlign.Center, maxLines = 2, softWrap = true,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
     }
 }

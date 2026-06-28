@@ -159,9 +159,11 @@ import java.io.File
 import java.io.FileOutputStream
 import com.ss.wealthtracker.R
 import com.example.wealthtracker.util.AverageRatesProvider
-import java.net.URL
+import java.net.URLEncoder
 import kotlinx.coroutines.withContext
 import android.util.Log
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import com.example.wealthtracker.ui.components.AppBottomNavBar
 import com.example.wealthtracker.ui.components.AppodealBanner
 import com.ss.wealthtracker.BuildConfig
@@ -191,16 +193,69 @@ private fun loadFdRatesQuick(ctx: android.content.Context): List<FdRateRow> {
     }.getOrDefault(emptyList())
 }
 
-// Mutual Fund name suggestions via public API (api.mfapi.in)
-private suspend fun fetchMfSuggest(q: String): List<String> = withContext(kotlinx.coroutines.Dispatchers.IO) {
+private val mfHttpClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
+        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+}
+
+private object MfRemoteConfig {
+    private const val CACHE_FILE = "mf_funds.txt"
+    private const val PREFS = "mf_rc_meta"
+    private const val KEY_TS = "mf_ts"
+    private const val TTL = 24L * 60 * 60 * 1000 // 1 day
+    private const val MF_LIST_URL = "https://api.mfapi.in/mf"
+
+    @Volatile private var allFunds: List<String> = emptyList()
+
+    fun isLoaded() = allFunds.isNotEmpty()
+
+    fun search(query: String): List<String> {
+        val q = query.trim().lowercase()
+        return allFunds.filter { it.lowercase().contains(q) }.take(15)
+    }
+
+    suspend fun load(ctx: android.content.Context) = withContext(kotlinx.coroutines.Dispatchers.IO) {
+        if (allFunds.isNotEmpty()) return@withContext
+        val cacheFile = java.io.File(ctx.cacheDir, CACHE_FILE)
+        val ts = ctx.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).getLong(KEY_TS, 0L)
+        if (cacheFile.exists() && System.currentTimeMillis() - ts < TTL) {
+            allFunds = cacheFile.readLines().filter { it.isNotEmpty() }
+            Log.d("MF_RC", "loaded ${allFunds.size} funds from file cache")
+            return@withContext
+        }
+        runCatching {
+            val request = Request.Builder().url(MF_LIST_URL).header("accept", "application/json").build()
+            val json = mfHttpClient.newCall(request).execute().use { it.body!!.string() }
+            val names = com.google.gson.JsonParser.parseString(json).asJsonArray
+                .mapNotNull { it.asJsonObject["schemeName"]?.asString }
+            if (names.isNotEmpty()) {
+                cacheFile.writeText(names.joinToString("\n"))
+                ctx.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+                    .edit().putLong(KEY_TS, System.currentTimeMillis()).apply()
+                allFunds = names
+                Log.d("MF_RC", "fetched and cached ${names.size} funds from mfapi.in")
+            }
+        }.onFailure { e ->
+            Log.e("MF_RC", "fetch failed", e)
+            if (cacheFile.exists()) {
+                allFunds = cacheFile.readLines().filter { it.isNotEmpty() }
+                Log.d("MF_RC", "using stale cache: ${allFunds.size} funds")
+            }
+        }
+    }
+}
+
+// Fallback: hit mfapi.in directly when Remote Config has no data yet
+private suspend fun fetchMfSuggest(ctx: android.content.Context, q: String): List<String> = withContext(kotlinx.coroutines.Dispatchers.IO) {
     runCatching {
-        val link = "https://api.mfapi.in/mf/search?q=" + java.net.URLEncoder.encode(q, "UTF-8")
-        val json = URL(link).openStream().use { it.readBytes().decodeToString() }
+        val url = "https://api.mfapi.in/mf/search?q=" + URLEncoder.encode(q, "UTF-8")
+        val request = Request.Builder().url(url).header("accept", "application/json").build()
+        val json = mfHttpClient.newCall(request).execute().use { it.body!!.string() }
         val arr = com.google.gson.JsonParser.parseString(json).asJsonArray
-        val list = arr.mapNotNull { el -> el.asJsonObject["schemeName"]?.asString }.take(15)
-        Log.d("MF_API", "q='$q' results=${list.size} first='${list.firstOrNull() ?: ""}'")
-        list
-    }.onFailure { e -> Log.e("MF_API", "error for q='$q'", e) }.getOrDefault(emptyList())
+        arr.mapNotNull { el -> el.asJsonObject["schemeName"]?.asString }.take(15)
+    }.onFailure { e -> Log.e("MF_API", "fallback error for q=\'$q\'", e) }.getOrDefault(emptyList())
 }
 
 // Stocks autocomplete via StocksApiProvider (Moneycontrol/Yahoo backed)
@@ -432,6 +487,7 @@ fun InvestmentScreen(
     var mfJustSelected by remember { mutableStateOf(false) }
     var mfCommittedName by remember { mutableStateOf<String?>(null) }
     var mfHasFocus by remember { mutableStateOf(false) }
+    var mfDataLoading by remember { mutableStateOf(false) }
     var bankExpanded by remember { mutableStateOf(false) }
     var selectedBank: String? by remember { mutableStateOf(pendingForEdit?.bankName) }
     var customBankName by remember { mutableStateOf("") }
@@ -499,20 +555,35 @@ fun InvestmentScreen(
         }
     }
 
-    // Debounced suggestions for MF and Stocks
+    // Load MF fund list from Remote Config when user switches to Mutual Fund
+    LaunchedEffect(invType) {
+        if (invType == "Mutual Fund" && !MfRemoteConfig.isLoaded()) {
+            mfDataLoading = true
+            MfRemoteConfig.load(context)
+            mfDataLoading = false
+        }
+    }
+
+    // MF suggestions — instant local search if RC data loaded, fallback to API otherwise
     LaunchedEffect(mfName, invType, mfJustSelected, mfCommittedName, mfHasFocus) {
         if (mfJustSelected) { mfJustSelected = false; return@LaunchedEffect }
-        // If the field shows a committed selection, do not fetch or expand
         if (invType == "Mutual Fund" && mfCommittedName != null && mfName.trim() == mfCommittedName!!.trim()) {
             mfSuggest = emptyList(); mfExpanded = false; return@LaunchedEffect
         }
         val q = mfName.trim()
         if (invType == "Mutual Fund" && q.length >= 2 && mfHasFocus) {
-            delay(250)
-            val latest = mfName.trim()
-            if (invType == "Mutual Fund" && latest == q) {
-                mfSuggest = fetchMfSuggest(q)
+            if (MfRemoteConfig.isLoaded()) {
+                // Local search — instant, no debounce needed
+                mfSuggest = MfRemoteConfig.search(q)
                 mfExpanded = mfSuggest.isNotEmpty()
+            } else {
+                // RC not ready yet — fall back to API with debounce
+                delay(500)
+                val latest = mfName.trim()
+                if (invType == "Mutual Fund" && latest == q) {
+                    mfSuggest = fetchMfSuggest(context, q)
+                    mfExpanded = mfSuggest.isNotEmpty()
+                }
             }
         } else {
             mfSuggest = emptyList()

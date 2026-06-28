@@ -17,6 +17,14 @@
         android:theme="@style/Theme.WealthTracker"
         tools:replace="android:allowBackup,android:fullBackupContent">
         
+        <!-- FCM: default icon + color for notifications delivered when app is closed/background -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification_app" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
