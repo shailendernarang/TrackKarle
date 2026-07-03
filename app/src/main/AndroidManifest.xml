@@ -51,6 +51,17 @@
             </intent-filter>
         </activity>
         
+        <!-- Morning reminder alarm receiver -->
+        <receiver
+            android:name="com.example.wealthtracker.util.ReminderAlarmReceiver"
+            android:exported="true" />
+
+
+        <!-- Handles snooze/dismiss actions from reminder notifications -->
+        <receiver
+            android:name="com.example.wealthtracker.util.ReminderSnoozeReceiver"
+            android:exported="true" />
+
         <!-- Widget Provider -->
         <receiver
             android:name="com.example.wealthtracker.widget.PortfolioWidgetProvider"

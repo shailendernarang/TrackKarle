@@ -47,8 +47,8 @@ android {
         applicationId "com.ss.wealthtracker"
         minSdk 24
         targetSdk 35
-        versionCode 27181000
-        versionName "27.18.1"
+        versionCode 27190000
+        versionName "27.19.0"
 
         buildConfigField 'String', 'RATES_URL', '"https://api.example.com/wealthtracker/avg_rates.json"'
         buildConfigField 'String', 'APPODEAL_API_KEY', '"' + (localProperties['appodeal.api.key'] ?: '') + '"'
@@ -230,6 +230,9 @@ dependencies {
     
     // Google Play Billing for in-app purchases and subscriptions
     implementation 'com.android.billingclient:billing-ktx:7.1.1'
+
+    // Google Play In-App Review API
+    implementation 'com.google.android.play:review-ktx:2.0.2'
     
     // Testing
     testImplementation 'junit:junit:4.13.2'

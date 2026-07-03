@@ -126,8 +126,8 @@ class ReminderManager private constructor(context: Context) {
                 if (!maturityDate.isNullOrBlank()) {
                     val daysUntil = calculateDaysUntilMaturity(maturityDate)
                     
-                    // Create reminder if maturity is within 90 days
-                    if (daysUntil in 0..90) {
+                    // Create reminder if maturity is within 365 days
+                    if (daysUntil in 0..365) {
                         val name = when (investment.investmentType) {
                             "FD" -> investment.bankName ?: "Fixed Deposit"
                             "PPF" -> "PPF Account"

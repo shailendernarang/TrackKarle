@@ -112,12 +112,17 @@ import androidx.biometric.BiometricManager.Authenticators
 import androidx.core.content.ContextCompat
 import com.example.wealthtracker.ui.components.RatingPromptManager
 import com.example.wealthtracker.util.BiometricUtils
+import com.example.wealthtracker.util.ReminderNotificationScheduler
 import com.example.wealthtracker.ui.components.PrivacyConsentDialog
 import com.example.wealthtracker.ui.components.PrivacyPreferences
 import com.example.wealthtracker.util.MarketWebSocket
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_OPEN_REMINDERS = "open_reminders"
+    }
     private var pendingLocaleTag: String? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         // Android 12+ system splash
@@ -188,6 +193,9 @@ class MainActivity : AppCompatActivity() {
         // Track app opens for rating prompt
         RatingPromptManager.incrementAppOpenCount(this)
         RatingPromptManager.startNewSession(this)
+
+        // Schedule daily 9 AM reminder notifications (idempotent — safe to call every open)
+        ReminderNotificationScheduler.scheduleDailyAt9AM(this)
         
         setContent {
             val systemDark = isSystemInDarkTheme()
@@ -236,6 +244,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     var showComposeSplash by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
                     val fromNotification = intent?.getBooleanExtra("from_notification", false) == true
+                    val openReminders = intent?.getBooleanExtra(EXTRA_OPEN_REMINDERS, false) == true
                     
                     // Initialize navigation early to avoid blank screen during transition
                     val nav = rememberNavController()
@@ -303,6 +312,8 @@ class MainActivity : AppCompatActivity() {
                                 "onboarding"
                             } else if (!isCountrySet) {
                                 "countrySelection"
+                            } else if (openReminders) {
+                                "reminders"
                             } else {
                                 rememberStartRoute(fromNotification, vm)
                             }

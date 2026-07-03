@@ -13,19 +13,20 @@ class WealthTrackerApp : Application() {
         super.onCreate()
         StocksApiProvider.init(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                DEFAULT_CHANNEL_ID,
-                "General",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "General notifications"
-            }
             val nm = getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(channel)
+            nm.createNotificationChannel(
+                NotificationChannel(DEFAULT_CHANNEL_ID, "General", NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = "General notifications" }
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(REMINDERS_CHANNEL_ID, "Investment Reminders", NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = "Morning reminders for maturing investments" }
+            )
         }
     }
 
     companion object {
         const val DEFAULT_CHANNEL_ID = "notifications_default"
+        const val REMINDERS_CHANNEL_ID = "reminders_channel"
     }
 }

@@ -63,7 +63,6 @@ import com.example.wealthtracker.ui.InvestmentViewModel
 import com.example.wealthtracker.ui.DebtViewModel
 import com.example.wealthtracker.data.local.DebtEntity
 import com.example.wealthtracker.util.FormatUtils
-import com.example.wealthtracker.ui.components.RatingPromptDialog
 import com.example.wealthtracker.ui.components.RatingPromptManager
 import com.example.wealthtracker.ui.components.MarketIndex
 import com.example.wealthtracker.ui.components.ReturnsInsightsCard
@@ -115,19 +114,15 @@ fun DashboardScreen(
         reminderManager.refreshSnoozedReminders()
     }
 
-    val activity = remember(ctx) {
-        ctx as? android.app.Activity
-            ?: (ctx as? androidx.appcompat.view.ContextThemeWrapper)?.baseContext as? android.app.Activity
-    }
+    val activity = LocalActivity.current
 
     var vizType by remember { mutableStateOf("Pie") }
 
-    var showRatingPrompt by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(3000)
-        if (RatingPromptManager.shouldShowPrompt(ctx)) {
-            showRatingPrompt = true
+        if (activity != null && RatingPromptManager.shouldShowPrompt(ctx)) {
             RatingPromptManager.markPromptShown(ctx)
+            RatingPromptManager.launchInAppReview(activity)
         }
     }
 
@@ -502,13 +497,6 @@ fun DashboardScreen(
                 }
             }
         }
-    }
-
-    if (showRatingPrompt) {
-        RatingPromptDialog(
-            onDismiss = { showRatingPrompt = false },
-            onRated = { RatingPromptManager.markUserRated(ctx); showRatingPrompt = false }
-        )
     }
 
     if (showReportsSheet) {

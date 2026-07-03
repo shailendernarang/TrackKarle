@@ -1294,8 +1294,9 @@ fun SearchSection(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     recent.take(4).forEach { s ->
                         AssistChip(
-                            onClick = { onQueryChange(s.symbol); onSearch(); focusManager.clearFocus(); keyboard?.hide() },
-                            label   = { Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            onClick      = { onQueryChange(s.symbol); onSearch(); focusManager.clearFocus(); keyboard?.hide() },
+                            label        = { Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon  = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                     }
                 }
