@@ -2,6 +2,12 @@
 -dontwarn com.facebook.infer.annotation.**
 -dontwarn com.facebook.ads.**
 
+## WorkManager (transitive via Appodeal adapters) — R8 on the AGP9 toolchain has been
+## observed stripping WorkDatabase_Impl's generated constructor, breaking WorkManager init.
+-keep class androidx.work.impl.WorkDatabase_Impl { <init>(...); }
+-keep class androidx.work.impl.** { *; }
+-dontwarn androidx.work.**
+
 ## Strip verbose logging in release builds (Log.e kept for genuine errors)
 -assumenosideeffects class android.util.Log {
     public static int d(...);

@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +50,7 @@ import com.example.wealthtracker.ui.screens.PortfolioScreen
 import com.example.wealthtracker.data.UserPreferences
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -124,6 +126,19 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_OPEN_REMINDERS = "open_reminders"
     }
     private var pendingLocaleTag: String? = null
+
+    // Guards against a single tap on the stocks tab/back-arrow being dispatched twice by the
+    // pointer input pipeline (observed: two identical click callbacks ~280ms apart), which pops
+    // both "stocks" and the underlying "dashboard" entry off the back stack in one go and leaves
+    // NavHost with nothing to render.
+    private var lastStocksNavActionAtMs = 0L
+    private fun debouncedStocksNavAction(action: () -> Unit) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastStocksNavActionAtMs > 400) {
+            lastStocksNavActionAtMs = now
+            action()
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         // Android 12+ system splash
         installSplashScreen()
@@ -319,6 +334,18 @@ class MainActivity : AppCompatActivity() {
                             }
                             
                             if (startRoute != null) {
+                                // Safety net: a race between NavHost's own back handling and a
+                                // screen-level BackHandler (e.g. Dashboard's "press back again to
+                                // exit") can pop the last remaining destination off the back stack
+                                // without anyone finishing the Activity, leaving a blank window with
+                                // nothing left to render. If that ever happens, back out gracefully
+                                // instead of showing a blank screen.
+                                val currentEntry by nav.currentBackStackEntryAsState()
+                                LaunchedEffect(currentEntry) {
+                                    if (currentEntry == null) {
+                                        moveTaskToBack(true)
+                                    }
+                                }
                                 NavHost(navController = nav, startDestination = startRoute) {
                                 // Onboarding screen
                                 composable("onboarding") {
@@ -386,7 +413,7 @@ class MainActivity : AppCompatActivity() {
                                             onOpenReminders = { nav.navigate("reminders") },
                                             onOpenDebt = { nav.navigate("debt") },
                                             onAddDebt  = { nav.navigate("debt?autoAdd=true") },
-                                            onOpenStocks = { nav.navigate("stocks") }
+                                            onOpenStocks = { debouncedStocksNavAction { nav.navigate("stocks") } }
                                         )
                                     }
                                 }
@@ -416,7 +443,7 @@ class MainActivity : AppCompatActivity() {
                                 ) {
                                     WithLocalizedContext(useHindiNumerals) {
                                         com.example.wealthtracker.ui.screens.StockAnalysisScreen(
-                                            onBack = { nav.popBackStack() }
+                                            onBack = { debouncedStocksNavAction { nav.popBackStack() } }
                                         )
                                     }
                                 }
@@ -474,7 +501,7 @@ class MainActivity : AppCompatActivity() {
                                             onOpenDashboard = { navTab("dashboard") },
                                             onOpenPortfolio = { navTab("portfolio") },
                                             onOpenCalculators = { navTab("calculators") },
-                                            onOpenStocks = { nav.navigate("stocks") },
+                                            onOpenStocks = { debouncedStocksNavAction { nav.navigate("stocks") } },
                                             onOpenSettings = { navTab("settings") },
                                             onBack = { nav.popBackStack() },
                                             showBack = canGoBack,
@@ -703,13 +730,10 @@ class MainActivity : AppCompatActivity() {
                                     BiometricPrompt.PromptInfo.Builder()
                                         .setTitle("Unlock")
                                         .setSubtitle("Confirm device lock to continue")
+                                        // DEVICE_CREDENTIAL is always part of BiometricUtils.getCompatibleAuthenticators(),
+                                        // and the system supplies its own cancel affordance for it — setting a negative
+                                        // button text alongside DEVICE_CREDENTIAL throws IllegalArgumentException.
                                         .setAllowedAuthenticators(BiometricUtils.getCompatibleAuthenticators())
-                                        .apply {
-                                            // For older versions, we need setNegativeButtonText when using DEVICE_CREDENTIAL
-                                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                                                setNegativeButtonText("Cancel")
-                                            }
-                                        }
                                         .build()
                                 }
                                 val km = getSystemService(KEYGUARD_SERVICE) as KeyguardManager

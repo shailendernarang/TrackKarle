@@ -1,5 +1,7 @@
 package com.example.wealthtracker.ui
 
+import android.appwidget.AppWidgetManager
+import android.content.Context
 import com.example.wealthtracker.data.local.InvestmentEntity
 import com.example.wealthtracker.data.repository.InvestmentRepository
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +21,9 @@ import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.MockedStatic
+import org.mockito.Mockito
+import org.mockito.kotlin.mock
 
 private class FakeRepo : InvestmentRepository {
     private val backing = mutableListOf<InvestmentEntity>()
@@ -62,20 +67,31 @@ private class FakeRepo : InvestmentRepository {
     override suspend fun exportJson(items: List<InvestmentEntity>): String = "[]"
     override suspend fun importCsv(csv: String) {}
     override suspend fun importJson(json: String) {}
+    override suspend fun getInvestmentCount(): Int = backing.size
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InvestmentViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
+    private lateinit var appWidgetManagerStatic: MockedStatic<AppWidgetManager>
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        // InvestmentViewModel.addInvestment() pokes the home-screen widget after a save;
+        // AppWidgetManager.getInstance() is a real platform static that isn't stubbed
+        // under the plain JVM unit test android.jar, so intercept it here.
+        val fakeAppWidgetManager = mock<AppWidgetManager>()
+        Mockito.`when`(fakeAppWidgetManager.getAppWidgetIds(Mockito.any())).thenReturn(IntArray(0))
+        appWidgetManagerStatic = Mockito.mockStatic(AppWidgetManager::class.java)
+        appWidgetManagerStatic.`when`<AppWidgetManager> { AppWidgetManager.getInstance(Mockito.any()) }
+            .thenReturn(fakeAppWidgetManager)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        appWidgetManagerStatic.close()
     }
 
     private suspend fun awaitSize(vm: InvestmentViewModel, expected: Int, timeoutMs: Long = 500) {
@@ -89,7 +105,7 @@ class InvestmentViewModelTest {
     @Test
     fun filtering_respects_type_and_sorting() = runTest {
         val repo = FakeRepo()
-        val vm = InvestmentViewModel(repo)
+        val vm = InvestmentViewModel(repo, mock<Context>())
         // Start collecting to activate stateIn lazy upstreams
         val collectJob = launch { vm.filteredInvestments.collect { /* no-op */ } }
         // Seed: three items; createdAt auto (now), so inject with explicit times via update after add
@@ -119,7 +135,7 @@ class InvestmentViewModelTest {
     @Test
     fun add_validation_gates() = runTest {
         val repo = FakeRepo()
-        val vm = InvestmentViewModel(repo)
+        val vm = InvestmentViewModel(repo, mock<Context>())
         // Start collecting to activate stateIn lazy upstreams
         val collectJob = launch { vm.filteredInvestments.collect { /* no-op */ } }
 

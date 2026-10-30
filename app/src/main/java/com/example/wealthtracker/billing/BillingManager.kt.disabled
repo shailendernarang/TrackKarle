@@ -54,7 +54,11 @@ class BillingManager @Inject constructor(
     private fun initializeBillingClient() {
         billingClient = BillingClient.newBuilder(context)
             .setListener(this)
-            .enablePendingPurchases()
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder()
+                    .enableOneTimeProducts()
+                    .build()
+            )
             .build()
         
         connectToBillingService()

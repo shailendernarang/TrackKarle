@@ -130,3 +130,9 @@ test_fresh_install.sh
 # Step-by-step guide assets
 app/src/main/assets/steps/
 app/src/main/assets/steps
+
+# Internal/confidential docs and reports (not needed in repo)
+.claude/
+confidential/
+docs/investment-data-model.md
+app/TrackKaro (WealthTracker) – Feature Analysis & Recommendations.pdf
